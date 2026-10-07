@@ -31,13 +31,13 @@ def build():
             "com.openai": {
                 "interface": {
                     "displayName": "Citation Lens",
-                    "shortDescription": "Read a field through citations",
+                    "shortDescription": "Search papers and follow citations",
                     "longDescription": project["description"],
-                    "developerName": "Null and Novel",
+                    "developerName": base["author"]["name"],
                     "category": "Productivity",
                     "capabilities": ["Read"],
                     "defaultPrompt": [
-                        "Research a topic through a citation graph and selected paper evidence."
+                        "Search papers on a topic, follow citations, and read relevant evidence."
                     ],
                 }
             }
@@ -74,8 +74,8 @@ def build():
     write(
         ROOT / ".agents/plugins/marketplace.json",
         {
-            "name": "null-and-novel",
-            "interface": {"displayName": "Null and Novel"},
+            "name": base["name"],
+            "interface": {"displayName": "Citation Lens"},
             "plugins": [
                 {
                     "name": "citation-lens",
@@ -89,8 +89,8 @@ def build():
     write(
         ROOT / ".claude-plugin/marketplace.json",
         {
-            "name": "null-and-novel",
-            "description": "Research tools by Null and Novel",
+            "name": base["name"],
+            "description": project["description"],
             "owner": {"name": "Aman Behera"},
             "plugins": [{**base, "source": "./"}],
         },

@@ -1,14 +1,14 @@
 {
-  "name": "null-and-novel",
-  "description": "Research tools by Null and Novel",
+  "name": "citation-lens",
+  "description": "Search papers, follow citations, and read text and figures.",
   "owner": {
     "name": "Aman Behera"
   },
   "plugins": [
     {
       "name": "citation-lens",
-      "version": "0.1.0",
-      "description": "Bounded citation snowballing and progressive paper reading for MCP agents",
+      "version": "0.1.1",
+      "description": "Search papers, follow citations, and read text and figures.",
       "author": {
         "name": "Aman Behera"
       },

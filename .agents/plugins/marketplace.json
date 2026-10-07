@@ -1,7 +1,7 @@
 {
-  "name": "null-and-novel",
+  "name": "citation-lens",
   "interface": {
-    "displayName": "Null and Novel"
+    "displayName": "Citation Lens"
   },
   "plugins": [
     {

@@ -66,4 +66,4 @@ jobs:
           fi
           cp docs/benchmark.json dist/synthetic-benchmark.json
           sha256sum dist/* > dist/SHA256SUMS
-          gh release create "$tag" dist/* --target "$GITHUB_SHA" --title "Citation Lens $tag (preview)" --prerelease --notes-file docs/RELEASE.md
+          gh release create "$tag" dist/* --target "$GITHUB_SHA" --title "Citation Lens $tag" --prerelease --notes-file docs/RELEASE.md

@@ -3,9 +3,9 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "null-and-novel-citation-lens"
-version = "0.1.0"
-description = "Bounded citation snowballing and progressive paper reading for MCP agents"
+name = "citation-lens"
+version = "0.1.1"
+description = "Search papers, follow citations, and read text and figures."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

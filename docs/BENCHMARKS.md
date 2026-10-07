@@ -88,7 +88,7 @@ subsequent selected reads, reasoning and synthesis are excluded. Full dumps of
 real papers have different lengths. The reduction is a fixture result, not a
 universal percentage.
 
-## Live provider run: 8 October 2026
+## Live provider run
 
 [live-benchmark.json](live-benchmark.json) records a successful OpenAlex run for `FlashAttention`.
 Five search hits included FlashAttention, FlashAttention-2, a second publication record
