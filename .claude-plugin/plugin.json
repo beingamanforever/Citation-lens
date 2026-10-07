@@ -1,0 +1,11 @@
+{
+  "name": "citation-lens",
+  "version": "0.1.0",
+  "description": "Bounded citation snowballing and progressive paper reading for MCP agents",
+  "author": {
+    "name": "Aman Behera"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/beingamanforever/Citation-lens",
+  "repository": "https://github.com/beingamanforever/Citation-lens"
+}

@@ -1,0 +1,609 @@
+{
+  "kind": "live provider workflow, not a paired Codex/Claude reasoning evaluation",
+  "recorded_at": "2026-10-07T18:47:27.505876+00:00",
+  "query": "FlashAttention",
+  "provider": "openalex",
+  "errors": [],
+  "full_text_attempts": [
+    {
+      "paper_id": "OA:W4281758439",
+      "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+      "source_url": "https://arxiv.org/html/2205.14135",
+      "format": "html",
+      "total_chars": 158816,
+      "warnings": [
+        "HTML extraction: verify complex tables against their visual when consequential."
+      ],
+      "fallback_errors": [],
+      "included_in_payload": true
+    },
+    {
+      "paper_id": "OA:W4384648639",
+      "title": "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning",
+      "source_url": "https://arxiv.org/html/2307.08691",
+      "format": "html",
+      "total_chars": 49121,
+      "warnings": [
+        "HTML extraction: verify complex tables against their visual when consequential."
+      ],
+      "fallback_errors": [],
+      "included_in_payload": true
+    }
+  ],
+  "search_only": {
+    "papers": [
+      {
+        "id": "OA:W4281758439",
+        "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+        "year": 2022,
+        "citations": 458,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "http://arxiv.org/abs/2205.14135",
+        "doi": "10.48550/arxiv.2205.14135",
+        "arxiv": "2205.14135",
+        "abstract_excerpt": "FlashAttention computes attention one block of keys at a time and divides by the softmax normalizer only at the end. How large is its rounding error, and is it worse than that of ordinary two-pass attention? This note bounds the forward error of FlashAttention-2 for one query, compares it with two-pass attention, and measures the one place where it really goes wrong: the split-KV (Flash-Decoding) merge. Main results One identity does most of the work. An error that hits a key's weight in both the numerator and the normalizer costs only the spread of the values around the output, not their size. Most of FlashAttention's roundings are of this k",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W4384648639",
+        "title": "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning",
+        "year": 2023,
+        "citations": 143,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "http://arxiv.org/abs/2307.08691",
+        "doi": "10.48550/arxiv.2307.08691",
+        "arxiv": "2307.08691",
+        "abstract_excerpt": "Scaling Transformers to longer sequence lengths has been a major problem in the last several years, promising to improve performance in language modeling and high-resolution image understanding, as well as to unlock new applications in code, audio, and video generation. The attention layer is the main bottleneck in scaling to longer sequences, as its runtime and memory increase quadratically in the sequence length. FlashAttention exploits the asymmetric GPU memory hierarchy to bring significant memory saving (linear instead of quadratic) and runtime speedup (2-4$\\times$ compared to optimized baselines), with no approximation. However, FlashAt",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W7133227460",
+        "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+        "year": 2022,
+        "citations": 530,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.52202/068431-1189",
+        "doi": "10.52202/068431-1189",
+        "arxiv": "",
+        "abstract_excerpt": "",
+        "excerpt_truncated": false,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7203934078",
+        "title": "FlashAttention for Scalable Vector Architectures",
+        "year": 2026,
+        "citations": 0,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://arxiv.org/abs/2608.18656",
+        "doi": "10.48550/arxiv.2608.18656",
+        "arxiv": "2608.18656",
+        "abstract_excerpt": "Inference with transformer models on CPUs is increasingly important, especially for Small Language Models (SLMs), where vector architectures are emerging as a promising execution substrate. The attention module is a major bottleneck due to high memory bandwidth requirements; FlashAttention mitigates this by fusing operations to improve data locality and reduce intermediate memory traffic. In this paper, we present FlashAttention-V, a blocked FlashAttention for scalable vector architectures that adapts efficiently from short to very long vectors by exploiting parallelism across attention heads, inter-head packing to enable efficient utilizatio",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W4417298707",
+        "title": "FLASH-D: FlashAttention with Hidden Softmax Division",
+        "year": 2025,
+        "citations": 0,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "http://arxiv.org/abs/2505.14201",
+        "doi": "10.48550/arxiv.2505.14201",
+        "arxiv": "2505.14201",
+        "abstract_excerpt": "The transformer's attention mechanism has revolutionized AI and machine learning, with its efficient computation being crucial to its performance. However, calculating attention involves matrix operations interspersed with softmax rescaling, which inherently slows down computation and requires processing the entire input sequence. Building on online softmax computation, FlashAttention integrates softmax calculation with matrix arithmetic, enabling tiled computation independent of sequence length. While optimized for GPUs, FlashAttention's simplicity makes it amenable to direct hardware acceleration. This work re-evaluates the core FlashAttent",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      }
+    ],
+    "total_indexed_matches": 6611,
+    "elapsed_ms": 590,
+    "http_requests": 1
+  },
+  "with_citation_lens": {
+    "node_count": 21,
+    "edge_count": 18,
+    "elapsed_ms": 1315,
+    "papers": [
+      {
+        "id": "OA:W4281758439",
+        "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+        "year": 2022,
+        "citations": 458,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "http://arxiv.org/abs/2205.14135",
+        "doi": "10.48550/arxiv.2205.14135",
+        "arxiv": "2205.14135",
+        "abstract_excerpt": "FlashAttention computes attention one block of keys at a time and divides by the softmax normalizer only at the end. How large is its rounding error, and is it worse than that of ordinary two-pass attention? This note bounds the forward error of FlashAttention-2 for one query, compares it with two-pass attention, and measures the one place where it really goes wrong: the split-KV (Flash-Decoding) merge. Main results One identity does most of the work. An error that hits a key's weight in both the numerator and the normalizer costs only the spread of the values around the output, not their size. Most of FlashAttention's roundings are of this k",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W4384648639",
+        "title": "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning",
+        "year": 2023,
+        "citations": 143,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "http://arxiv.org/abs/2307.08691",
+        "doi": "10.48550/arxiv.2307.08691",
+        "arxiv": "2307.08691",
+        "abstract_excerpt": "Scaling Transformers to longer sequence lengths has been a major problem in the last several years, promising to improve performance in language modeling and high-resolution image understanding, as well as to unlock new applications in code, audio, and video generation. The attention layer is the main bottleneck in scaling to longer sequences, as its runtime and memory increase quadratically in the sequence length. FlashAttention exploits the asymmetric GPU memory hierarchy to bring significant memory saving (linear instead of quadratic) and runtime speedup (2-4$\\times$ compared to optimized baselines), with no approximation. However, FlashAt",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W7133227460",
+        "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+        "year": 2022,
+        "citations": 530,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.52202/068431-1189",
+        "doi": "10.52202/068431-1189",
+        "arxiv": "",
+        "abstract_excerpt": "",
+        "excerpt_truncated": false,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W4387321091",
+        "title": "Efficient Memory Management for Large Language Model Serving with PagedAttention",
+        "year": 2023,
+        "citations": 1631,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1145/3600006.3613165",
+        "doi": "10.1145/3600006.3613165",
+        "arxiv": "",
+        "abstract_excerpt": "High throughput serving of large language models (LLMs) requires batching sufficiently many requests at a time. However, existing systems struggle because the key-value cache (KV cache) memory for each request is huge and grows and shrinks dynamically. When managed inefficiently, this memory can be significantly wasted by fragmentation and redundant duplication, limiting the batch size. To address this problem, we propose PagedAttention, an attention algorithm inspired by the classical virtual memory and paging techniques in operating systems. On top of it, we build vLLM, an LLM serving system that achieves (1) near-zero waste in KV cache mem",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W4410090477",
+        "title": "Generalizable AI predicts immunotherapy outcomes across cancers and treatments",
+        "year": 2026,
+        "citations": 19,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1038/s41591-026-04502-7",
+        "doi": "10.1038/s41591-026-04502-7",
+        "arxiv": "",
+        "abstract_excerpt": "Immune checkpoint inhibitors are standard across cancers, yet most patients do not respond and existing biomarkers generalize poorly across tumor types, drugs and clinical settings. We present C ompass , a pan-cancer foundation model that predicts immunotherapy response from bulk tumor transcriptomes using a concept-bottleneck transformer. C ompass encodes gene expression through 44 biologically grounded immune concepts representing immune cell states, tumor-microenvironment interactions, and signaling pathways. Trained on 10,184 tumors across 33 cancer types, C ompass outperforms 22 baseline methods in 16 independent clinical cohorts spannin",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W4391876619",
+        "title": "Lost in the Middle: How Language Models Use Long Contexts",
+        "year": 2024,
+        "citations": 1381,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1162/tacl_a_00638",
+        "doi": "10.1162/tacl_a_00638",
+        "arxiv": "",
+        "abstract_excerpt": "Abstract While recent language models have the ability to take long contexts as input, relatively little is known about how well they use longer context. We analyze the performance of language models on two tasks that require identifying relevant information in their input contexts: multi-document question answering and key-value retrieval. We find that performance can degrade significantly when changing the position of relevant information, indicating that current language models do not robustly make use of information in long input contexts. In particular, we observe that performance is often highest when relevant information occurs at the ",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W7214019972",
+        "title": "Coevolutionary mining of prokaryotic non-coding elements with a genome language model",
+        "year": 2026,
+        "citations": 1,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.64898/2026.09.22.753630",
+        "doi": "10.64898/2026.09.22.753630",
+        "arxiv": "",
+        "abstract_excerpt": "Abstract Microbial genomes encode non-coding RNAs (ncRNAs) and nucleic-acid-interacting proteins essential to biology and biotechnology. However, discovery of these systems remains protein-centric and based on similarity to known sequences. Here, we introduce Minerva, a framework for coevolutionary mining that uses genome language models to predict pairwise interactions directly from sequence. Minerva enables fast, alignment-free prediction of base pairing, monomeric protein contacts, and repetitive sequence motifs. We recover known systems such as CRISPR, detect open-reading-frame signatures at the DNA level without supervision, and predict ",
+        "excerpt_truncated": true,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W4366208220",
+        "title": "DINOv2: Learning Robust Visual Features without Supervision",
+        "year": 2023,
+        "citations": 1067,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "http://arxiv.org/abs/2304.07193",
+        "doi": "10.48550/arxiv.2304.07193",
+        "arxiv": "2304.07193",
+        "abstract_excerpt": "The recent breakthroughs in natural language processing for model pretraining on large quantities of data have opened the way for similar foundation models in computer vision. These models could greatly simplify the use of images in any system by producing all-purpose visual features, i.e., features that work across image distributions and tasks without finetuning. This work shows that existing pretraining methods, especially self-supervised methods, can produce such features if trained on enough curated data from diverse sources. We revisit existing approaches and combine different techniques to scale our pretraining in terms of data and mod",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W7168046767",
+        "title": "UniEP: Unified Expert-Parallel MegaKernel MoE for LLM Training",
+        "year": 2026,
+        "citations": 0,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1145/3806645.3807818",
+        "doi": "10.1145/3806645.3807818",
+        "arxiv": "",
+        "abstract_excerpt": "As LLM training grows increasingly resource-intensive and expert parallelism (EP) becomes essential for scaling MoE models, EP optimizations are widely adopted in production frameworks like Megatron-LM. Existing solutions often rely on ad-hoc, complex kernels that lack adaptability across diverse optimization configurations and frequently neglect numerical stability, failing to meet the strict precision requirements of large-scale training.",
+        "excerpt_truncated": false,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W4402667891",
+        "title": "Point Transformer V3: Simpler, Faster, Stronger",
+        "year": 2024,
+        "citations": 614,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1109/cvpr52733.2024.00463",
+        "doi": "10.1109/cvpr52733.2024.00463",
+        "arxiv": "",
+        "abstract_excerpt": "This paper is not motivated to seek innovation within the attention mechanism. Instead, it focuses on overcoming the existing trade-offs between accuracy and efficiency within the context of point cloud processing, leveraging the power of scale. Drawing inspiration from recent advances in 3D large-scale representation learning, we recognize that model performance is more influenced by scale than by intricate design. Therefore, we present Point Transformer V3 (PTv3), which prioritizes simplicity and efficiency over the accuracy of certain mechanisms that are minor to the over-all performance after scaling, such as replacing the precise neighbo",
+        "excerpt_truncated": true,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W4411757935",
+        "title": "Predicting cellular responses to perturbation across diverse contexts with State",
+        "year": 2026,
+        "citations": 88,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1016/j.cell.2026.07.052",
+        "doi": "10.1016/j.cell.2026.07.052",
+        "arxiv": "",
+        "abstract_excerpt": "While machine learning models offer potential for predicting transcriptomic effects of perturbation, they currently struggle to generalize across cellular contexts. Here, we introduce State, a machine learning model that predicts perturbation effects while accounting for cellular heterogeneity within and across experiments. State is trained using single-cell gene expression data to predict perturbation effects across sets of cells. State improved discrimination of effects on large datasets by more than 30% and identified differentially expressed genes across genetic, signaling, and chemical perturbations with significantly improved accuracy c",
+        "excerpt_truncated": true,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W4402727033",
+        "title": "Efficient Deformable ConvNets: Rethinking Dynamic and Sparse Operator for Vision Applications",
+        "year": 2024,
+        "citations": 257,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1109/cvpr52733.2024.00540",
+        "doi": "10.1109/cvpr52733.2024.00540",
+        "arxiv": "",
+        "abstract_excerpt": "We introduce Deformable Convolution v4 (DCNv4), a highly efficient and effective operator designed for a broad spectrum of vision applications. DCNv4 addresses the limitations of its predecessor, DCNv3, with two key enhancements: 1. removing softmax normalization in spatial aggregation to enhance its dynamic property and expressive power and 2. optimizing memory access to minimize redundant operations for speedup. These improvements result in a significantly faster convergence compared to DCNv3 and a substantial increase in processing speed, with DCNv4 achieving more than three times the forward speed. DCNv4 demonstrates exceptional performan",
+        "excerpt_truncated": true,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7160400729",
+        "title": "From computation to environmental cost the resource burden of artificial intelligence",
+        "year": 2026,
+        "citations": 4,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1038/s43247-026-03537-5",
+        "doi": "10.1038/s43247-026-03537-5",
+        "arxiv": "",
+        "abstract_excerpt": "Abstract Here we quantify the material footprint of artificial intelligence training by linking computational workloads to physical hardware needs. Graphics processing unit demand is expressed as equivalent hardware lifetime consumed and, thus, the material demand involved. As computational demands rise, assessing the environmental impact of artificial intelligence requires moving beyond energy and water consumption to include the material demands of specialized hardware. We analyzed the elemental composition of a widely used graphics processing unit identifying 32 elements. The results show that artificial intelligence hardware consists of a",
+        "excerpt_truncated": true,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W4399367209",
+        "title": "Transformers and large language models in healthcare: A review",
+        "year": 2024,
+        "citations": 194,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1016/j.artmed.2024.102900",
+        "doi": "10.1016/j.artmed.2024.102900",
+        "arxiv": "",
+        "abstract_excerpt": "With Artificial Intelligence (AI) increasingly permeating various aspects of society, including healthcare, the adoption of the Transformers neural network architecture is rapidly changing many applications. Transformer is a type of deep learning architecture initially developed to solve general-purpose Natural Language Processing (NLP) tasks and has subsequently been adapted in many fields, including healthcare. In this survey paper, we provide an overview of how this architecture has been adopted to analyze various forms of healthcare data, including clinical NLP, medical imaging, structured Electronic Health Records (EHR), social media, bi",
+        "excerpt_truncated": true,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7167260123",
+        "title": "Raw-count embeddings improve single-cell foundation models",
+        "year": 2026,
+        "citations": 0,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.64898/2026.06.29.735389",
+        "doi": "10.64898/2026.06.29.735389",
+        "arxiv": "",
+        "abstract_excerpt": "Abstract Single-cell transformer foundation models have grown to hundreds of millions of parameters, yet the preprocessing choices that underlie them, including gene ranking and library-size normalisation, have not been systematically benchmarked. Testing seven strategies, we find these elaborations are largely unnecessary: non-normalised, log-transformed counts give the best performance, and gene order barely matters, with even random ordering outperforming sophisticated rank-based schemes. The resulting model, Gene Intelligence, projects log1p-transformed raw counts directly onto each token embedding and jointly predicts masked tokens and c",
+        "excerpt_truncated": true,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7160065441",
+        "title": "Emulating Self-attention with Convolution for Efficient Image Super-Resolution",
+        "year": 2025,
+        "citations": 19,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1109/iccv51701.2025.02268",
+        "doi": "10.1109/iccv51701.2025.02268",
+        "arxiv": "",
+        "abstract_excerpt": "",
+        "excerpt_truncated": false,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7140752993",
+        "title": "High-performance training and inference for deep equivariant interatomic potentials",
+        "year": 2026,
+        "citations": 15,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1039/d5dd00423c",
+        "doi": "10.1039/d5dd00423c",
+        "arxiv": "",
+        "abstract_excerpt": "The NequIP framework is redesigned for scalable distributed training and PyTorch 2.0 compilation. AOT Inductor inference and optimized Allegro kernels accelerate molecular dynamics by factors of 5\u201318 on practical system sizes.",
+        "excerpt_truncated": false,
+        "full_text_available": true
+      },
+      {
+        "id": "OA:W4415707504",
+        "title": "GraphLLM: Boosting Graph Reasoning Ability of Large Language Model",
+        "year": 2025,
+        "citations": 18,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1109/tbdata.2025.3627488",
+        "doi": "10.1109/tbdata.2025.3627488",
+        "arxiv": "",
+        "abstract_excerpt": "The advancement of Large Language Models (LLMs) has remarkably pushed the boundaries towards artificial general intelligence (AGI), with their exceptional ability on understanding diverse types of information, including but not limited to images and audio. Despite this progress, a critical gap remains in empowering LLMs to proficiently understand and reason on graph data, which is ubiquitous in Big Data applications such as social networks, knowledge graphs, and molecular databases. Recent studies underscore LLMs' underwhelming performance on fundamental graph reasoning tasks. In this paper, we endeavor to unearth the obstacles that impede LL",
+        "excerpt_truncated": true,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7202137368",
+        "title": "CacheRoute: KV-Cache-Aware Routing for LLM Backend Services on Kubernetes",
+        "year": 2026,
+        "citations": 8,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1109/eitce70137.2026.11634378",
+        "doi": "10.1109/eitce70137.2026.11634378",
+        "arxiv": "",
+        "abstract_excerpt": "",
+        "excerpt_truncated": false,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7214896783",
+        "title": "Generative AI on a General-Purpose Neural Processor (GPNPU)",
+        "year": 2026,
+        "citations": 0,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1541/ieejjournal.146.598",
+        "doi": "10.1541/ieejjournal.146.598",
+        "arxiv": "",
+        "abstract_excerpt": "1\uff0e\u306f\u3058\u3081\u306b",
+        "excerpt_truncated": false,
+        "full_text_available": false
+      },
+      {
+        "id": "OA:W7160087193",
+        "title": "MagicDrive-V2: High-Resolution Long Video Generation for Autonomous Driving with Adaptive Control",
+        "year": 2025,
+        "citations": 11,
+        "citation_status": null,
+        "provider": "openalex",
+        "url": "https://doi.org/10.1109/iccv51701.2025.02612",
+        "doi": "10.1109/iccv51701.2025.02612",
+        "arxiv": "",
+        "abstract_excerpt": "",
+        "excerpt_truncated": false,
+        "full_text_available": false
+      }
+    ],
+    "edges": [
+      {
+        "from": "OA:W4387321091",
+        "to": "OA:W4281758439",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4410090477",
+        "to": "OA:W4281758439",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4391876619",
+        "to": "OA:W4281758439",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7214019972",
+        "to": "OA:W4281758439",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4366208220",
+        "to": "OA:W4281758439",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7168046767",
+        "to": "OA:W4281758439",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4402667891",
+        "to": "OA:W4384648639",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4411757935",
+        "to": "OA:W4384648639",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4402727033",
+        "to": "OA:W4384648639",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7160400729",
+        "to": "OA:W4384648639",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4399367209",
+        "to": "OA:W4384648639",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7167260123",
+        "to": "OA:W4384648639",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7160065441",
+        "to": "OA:W7133227460",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7140752993",
+        "to": "OA:W7133227460",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W4415707504",
+        "to": "OA:W7133227460",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7202137368",
+        "to": "OA:W7133227460",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7214896783",
+        "to": "OA:W7133227460",
+        "provider": "openalex",
+        "evidence": null
+      },
+      {
+        "from": "OA:W7160087193",
+        "to": "OA:W7133227460",
+        "provider": "openalex",
+        "evidence": null
+      }
+    ],
+    "coverage": [
+      {
+        "seed": "OA:W4281758439",
+        "direction": "backward",
+        "indexed": 0,
+        "examined_ids": 0,
+        "returned_records": 0,
+        "sampled": false,
+        "ordering": "reference ID sample; selected by local heuristic",
+        "retrieved_unique": 0,
+        "selected": 0,
+        "retained": 0
+      },
+      {
+        "seed": "OA:W4281758439",
+        "direction": "forward",
+        "indexed": 457,
+        "sampled": true,
+        "ordering": "union of prominent and recent pages",
+        "retrieved_unique": 12,
+        "selected": 6,
+        "retained": 6
+      },
+      {
+        "seed": "OA:W4384648639",
+        "direction": "backward",
+        "indexed": 0,
+        "examined_ids": 0,
+        "returned_records": 0,
+        "sampled": false,
+        "ordering": "reference ID sample; selected by local heuristic",
+        "retrieved_unique": 0,
+        "selected": 0,
+        "retained": 0
+      },
+      {
+        "seed": "OA:W4384648639",
+        "direction": "forward",
+        "indexed": 141,
+        "sampled": true,
+        "ordering": "union of prominent and recent pages",
+        "retrieved_unique": 11,
+        "selected": 6,
+        "retained": 6
+      },
+      {
+        "seed": "OA:W7133227460",
+        "direction": "backward",
+        "indexed": 0,
+        "examined_ids": 0,
+        "returned_records": 0,
+        "sampled": false,
+        "ordering": "reference ID sample; selected by local heuristic",
+        "retrieved_unique": 0,
+        "selected": 0,
+        "retained": 0
+      },
+      {
+        "seed": "OA:W7133227460",
+        "direction": "forward",
+        "indexed": 529,
+        "sampled": true,
+        "ordering": "union of prominent and recent pages",
+        "retrieved_unique": 12,
+        "selected": 6,
+        "retained": 6
+      }
+    ],
+    "errors": [],
+    "first_graph_page_bytes": 11405,
+    "http_requests": 7
+  },
+  "paired_payload": {
+    "readable_papers": 2,
+    "paper_ids": [
+      "OA:W4281758439",
+      "OA:W4384648639"
+    ],
+    "cards_bytes": 2011,
+    "full_text_dump_bytes": 218270,
+    "reduction_percent": 99.08,
+    "definition": "Compact UTF-8 JSON for the same readable papers. Full dump = cards plus extracted text, excluding images. Not actual model tokens.",
+    "selection": "Graph papers whose title contains the query, with advertised full text."
+  },
+  "http_totals": {
+    "requests": 9,
+    "cache_hits": 0
+  },
+  "caveat": "One query, three unscreened search seeds, one bounded hop. Additional papers may be irrelevant. Provider ranking and corpus change. Does not measure research quality, SOTA coverage, whole-host latency or accuracy uplift. Failures are retained."
+}

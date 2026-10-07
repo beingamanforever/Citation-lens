@@ -1,0 +1,20 @@
+{
+  "name": "null-and-novel",
+  "interface": {
+    "displayName": "Null and Novel"
+  },
+  "plugins": [
+    {
+      "name": "citation-lens",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

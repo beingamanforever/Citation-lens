@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "citation-lens": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--no-project",
+        "--with-requirements",
+        "${PLUGIN_ROOT}/requirements-runtime.txt",
+        "python",
+        "${PLUGIN_ROOT}/run.py"
+      ],
+      "env": {
+        "CITATION_LENS_DATA": "${PLUGIN_DATA}/data"
+      }
+    }
+  },
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
+}

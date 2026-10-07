@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "null-and-novel-citation-lens"
+version = "0.1.0"
+description = "Bounded citation snowballing and progressive paper reading for MCP agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Aman Behera"}]
+dependencies = ["mcp==1.28.1", "pydantic-settings==2.11.0", "httpx>=0.28.1,<1", "beautifulsoup4>=4.14,<5", "markdownify>=1.2,<2", "pypdf>=6,<7", "pypdfium2>=5,<6", "pillow>=12,<13"]
+
+[project.urls]
+Homepage = "https://github.com/beingamanforever/Citation-lens"
+Repository = "https://github.com/beingamanforever/Citation-lens"
+Issues = "https://github.com/beingamanforever/Citation-lens/issues"
+
+[project.scripts]
+citation-lens = "citation_lens.server:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.14,<1", "build>=1,<2", "jsonschema>=4,<5"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/citation_lens"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
