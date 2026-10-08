@@ -406,7 +406,9 @@ def test_citations_keep_s2_results_and_report_openalex_deadline(store):
 
 
 def test_citations_finish_before_caller_deadline_when_openalex_hangs(store, monkeypatch):
-    monkeypatch.setattr(papers_module, "CITATION_PROVIDER_SECONDS", 0.02)
+    # Allow cold SQLite I/O and Windows timer resolution; the hung request remains blocked
+    # indefinitely, so returning its timeout still requires the provider deadline to work.
+    monkeypatch.setattr(papers_module, "CITATION_PROVIDER_SECONDS", 1.0)
     openalex_started = asyncio.Event()
     release_openalex = asyncio.Event()
 
@@ -440,7 +442,7 @@ def test_citations_finish_before_caller_deadline_when_openalex_hangs(store, monk
             }
         )
         try:
-            found, errors = await asyncio.wait_for(papers.citations(seed, "2024-01-01"), 0.1)
+            found, errors = await asyncio.wait_for(papers.citations(seed, "2024-01-01"), 5.0)
             assert openalex_started.is_set()
             assert [paper["title"] for paper in found] == ["Healthy S2 Citation"]
             assert len(errors) == 1 and "openalex" in errors[0].casefold()

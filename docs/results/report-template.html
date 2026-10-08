@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Citation Lens Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,650&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; a verdict, a small-multiples chart, then evidence in order of importance. */
+:root {
+  --bg: #f5f6f8; --surface: #fcfcfb; --ink: #15202b; --muted: #56616d; --rule: #dde2e8;
+  --lens: #2a78d6; --codex: #eb6834; --good: #0f7a4f; --cost: #a4410f; --chip: #e9eef5;
+  --display: "Literata", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111315; --surface: #1a1a19; --ink: #eef1f4; --muted: #a6b0ba; --rule: #2c3238;
+    --lens: #3987e5; --codex: #d95926; --good: #4cc38a; --cost: #f08a5a; --chip: #222a33;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); margin: 0; }
+main { max-width: 860px; margin: 0 auto; padding-inline: 16px; padding-block: 40px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--display); font-weight: 650; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 40px); line-height: 1.15; }
+h2 { font-size: 21px; margin-bottom: 12px; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font: 500 12px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+header { display: grid; gap: 14px; }
+.lede { font-size: 17px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { background: var(--chip); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.chip b { font-family: var(--mono); font-weight: 500; }
+.chip.cost b { color: var(--cost); }
+.chip.win b { color: var(--good); }
+section { display: grid; gap: 14px; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; }
+.legend { display: flex; gap: 18px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.multiples { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px 28px; margin-top: 16px; }
+.metric h3 { font: 600 14px/1.3 var(--body); margin: 0 0 2px; }
+.metric small { color: var(--muted); font-size: 12px; display: block; margin-bottom: 10px; }
+.bar { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; margin-bottom: 6px; position: relative; }
+.track { height: 14px; }
+.fill { height: 100%; width: calc(var(--v) * 100%); background: var(--c); border-radius: 0 4px 4px 0; }
+.bar output { font: 500 13px/1 var(--mono); color: var(--ink); min-width: 4.5ch; text-align: right; font-variant-numeric: tabular-nums; }
+.bar:hover .fill, .bar:focus-within .fill { filter: brightness(1.12); }
+.tip { position: absolute; left: 0; bottom: 120%; background: var(--ink); color: var(--bg); font-size: 12px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.bar:hover .tip, .bar:focus .tip { opacity: 1; }
+.bar:focus { outline: 2px solid var(--lens); outline-offset: 2px; border-radius: 3px; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+td.n { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+th.n { text-align: right; }
+tr.better td.lensv { color: var(--good); font-weight: 500; }
+tr.worse td.lensv { color: var(--cost); font-weight: 500; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.step { border-top: 3px solid var(--lens); padding-top: 10px; }
+.step h3 { font: 600 14px/1.3 var(--body); margin: 0 0 4px; }
+.step p { font-size: 14px; color: var(--muted); }
+ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 70ch; }
+code { font: 13px var(--mono); background: var(--chip); padding: 1px 5px; border-radius: 4px; word-break: break-word; }
+.note { font-size: 13px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) { .tip { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Held-out evaluation</div>
+    <h1>Citation Lens improves Codex paper search on this benchmark</h1>
+    <p class="lede">On {{HELDOUT_TASKS}} unseen research tasks, run {{REPETITIONS}} times each, Codex with Citation Lens won {{PAIR_LENS}} of {{ATTEMPTS_PER_ARM}} blinded comparisons against the same Codex with only web search. Web search won {{PAIR_WEB}} and {{PAIR_TIES}} were ties. Lens found more useful and recent papers and more verified citation links on average; it was slower and completed one fewer attempt.</p>
+    <div class="chips">
+      <span class="chip win">Pairwise <b>{{PAIR_LENS}}-{{PAIR_WEB}}</b> ({{PAIR_TIES}} ties)</span>
+      <span class="chip win">Useful papers <b>{{USEFUL_CHANGE}}</b></span>
+      <span class="chip win">Recent papers <b>{{RECENT_CHANGE}}</b></span>
+      <span class="chip win">Verified citation links <b>{{CITATION_CHANGE}}</b></span>
+      <span class="chip cost">Time <b>{{TIME_CHANGE}}</b></span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Mean per attempt, held-out tasks</h2>
+    <div class="panel">
+      <div class="legend">
+        <span style="--c: var(--codex)">Codex (web search)</span>
+        <span style="--c: var(--lens)">Codex + Citation Lens</span>
+      </div>
+      <div class="multiples" id="multiples"></div>
+    </div>
+    <p class="note">Each panel has its own scale. A timeout counts as zero papers. {{ATTEMPTS_PER_ARM}} attempts per arm; Lens answered {{LENS_ANSWERED}} and web search answered {{WEB_ANSWERED}}.</p>
+  </section>
+
+  <section>
+    <h2>Audited measures</h2>
+    <div class="panel scroll">
+      <table>
+        <caption class="sr-only">Audited held-out results, mean per attempt unless stated otherwise</caption>
+        <thead><tr><th>Measure (held-out, mean per attempt)</th><th class="n">Codex</th><th class="n">Codex + Lens</th></tr></thead>
+        <tbody>
+          <tr class="better"><td>Pairwise wins, judged twice with order swapped</td><td class="n">{{PAIR_WEB}}</td><td class="n lensv">{{PAIR_LENS}}</td></tr>
+          <tr class="better"><td>Useful papers (exist, right URL, judged relevant)</td><td class="n">{{WEB_USEFUL}}</td><td class="n lensv">{{LENS_USEFUL}}</td></tr>
+          <tr class="better"><td>Core useful papers</td><td class="n">{{WEB_CORE}}</td><td class="n lensv">{{LENS_CORE}}</td></tr>
+          <tr class="better"><td>Recent useful papers (last two years)</td><td class="n">{{WEB_RECENT}}</td><td class="n lensv">{{LENS_RECENT}}</td></tr>
+          <tr class="better"><td>Prominent useful papers (100+ citations)</td><td class="n">{{WEB_PROMINENT}}</td><td class="n lensv">{{LENS_PROMINENT}}</td></tr>
+          <tr class="better"><td>Verified citation links between useful papers</td><td class="n">{{WEB_CITATIONS}}</td><td class="n lensv">{{LENS_CITATIONS}}</td></tr>
+          <tr class="better"><td>Precision, answered attempts</td><td class="n">{{WEB_PRECISION}}</td><td class="n lensv">{{LENS_PRECISION}}</td></tr>
+          <tr class="better"><td>Must-find papers recovered (anchor recall)</td><td class="n">{{WEB_ANCHOR}}</td><td class="n lensv">{{LENS_ANCHOR}}</td></tr>
+          <tr class="better"><td>Wrong URLs</td><td class="n">{{WEB_WRONG_URL}}</td><td class="n lensv">{{LENS_WRONG_URL}}</td></tr>
+          <tr class="better"><td>Quotes found by the current revision-2 checker</td><td class="n">{{WEB_QUOTES}}</td><td class="n lensv">{{LENS_QUOTES}}</td></tr>
+          <tr class="worse"><td>Answered within {{DEADLINE}} s</td><td class="n">{{WEB_ANSWERED}} / {{ATTEMPTS_PER_ARM}}</td><td class="n lensv">{{LENS_ANSWERED}} / {{ATTEMPTS_PER_ARM}}</td></tr>
+          <tr class="worse"><td>Seconds</td><td class="n">{{WEB_SECONDS}}</td><td class="n lensv">{{LENS_SECONDS}}</td></tr>
+          <tr class="worse"><td>Input tokens, including cached (reported attempts)</td><td class="n">{{WEB_INPUT_TOKENS}}</td><td class="n lensv">{{LENS_INPUT_TOKENS}}</td></tr>
+          <tr><td>Attempts missing token usage</td><td class="n">{{WEB_TOKEN_MISSING}}</td><td class="n lensv">{{LENS_TOKEN_MISSING}}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">The token means exclude {{WEB_TOKEN_MISSING}} web attempt and {{LENS_TOKEN_MISSING}} Lens attempts with missing usage. In the {{BOTH_ANSWERED}} matched runs where both arms answered, Lens found more useful papers in {{USEFUL_LENS_HIGHER}} and more recent papers in {{RECENT_LENS_HIGHER}}. Verified useful citation links were higher for Lens in {{CITATION_LENS_HIGHER}}, higher for web in {{CITATION_WEB_HIGHER}}, and tied in {{CITATION_TIES}}.</p>
+  </section>
+
+  <section>
+    <h2>What the measured package did</h2>
+    <div class="steps">
+      <div class="step"><h3>Search wide</h3><p>Query Semantic Scholar, OpenAlex and arXiv together and fuse the results.</p></div>
+      <div class="step"><h3>Expand the graph</h3><p>Follow references and citing papers from selected seeds, preserving partial provider results and gaps.</p></div>
+      <div class="step"><h3>Balance the list</h3><p>Interleave foundational work, follow-ups and recent papers rather than returning one ranking.</p></div>
+      <div class="step"><h3>Preview, then read</h3><p>Return compact cards first and fetch abstracts, text or figures on demand.</p></div>
+    </div>
+    <p class="note">The measured package was <code>{{PACKAGE}}</code>. Its saved Lens tool-result payload averaged {{LENS_BYTES_KB}} per attempt.</p>
+  </section>
+
+  <section>
+    <h2>How it was measured</h2>
+    <ul>
+      <li><b>{{TOTAL_TASKS}} tasks and {{TOTAL_ANCHORS}} must-find anchors, including {{RECENT_ANCHORS}} recent anchors.</b> {{DEVELOPMENT_TASKS}} tasks were used for development; {{HELDOUT_TASKS}} were held out and each ran {{REPETITIONS}} times per arm.</li>
+      <li><b>Same conditions except the research tools.</b> Both arms used <code>{{MODEL}}</code> at {{EFFORT}} effort, the same prompt and schema, a {{TOOL_BUDGET}}-call budget and a {{DEADLINE}} s deadline.</li>
+      <li><b>Quote matching preserves scientific notation.</b> The current revision-2 checker collapses whitespace only, so operators, signs and punctuation remain part of the match. It checks abstracts first and arXiv full text when available.</li>
+      <li><b>Citation proof keeps sources distinct.</b> Of {{VERIFIED_PROOF}} verified links, {{PRIMARY_PROOF}} used the citing paper's own reference metadata: {{PRIMARY_IDENTIFIER_PROOF}} matched cited-paper identifiers and {{PRIMARY_TITLE_PROOF}} matched complete title-author-year evidence. Another {{INDEX_PROOF}} used separately labelled index reference IDs.</li>
+      <li><b>Judgment was blinded and order-swapped.</b> The judge was <code>{{JUDGE_MODEL}}</code> at {{JUDGE_EFFORT}} effort. Pooled relevance labels and pairwise comparison ran twice with the answer order swapped.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Read before relying on this</h2>
+    <ul>
+      <li><b>This is an earlier package measurement.</b> Results apply to package <code>{{PACKAGE}}</code>. Production repairs made after that snapshot need a new evaluation.</li>
+      <li><b>The Claude comparison is still running.</b> Claude login and a real request now work; no Claude result is included here until the paired run finishes.</li>
+      <li><b>The judge uses the same model family as the agents.</b> Both arms are equally exposed, but the labels are not human-calibrated.</li>
+      <li><b>Lens was slower and completed one fewer attempt.</b> Its quality gains on this benchmark came with about {{TIME_CHANGE}} mean elapsed time and incomplete token reporting.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Source</h2>
+    <ul class="note">
+      <li>Frozen attempts, protocol, grading, paper checks and judge reasons: <code>docs/results/codex-heldout.json</code></li>
+      <li>Canonical task and anchor set: <code>evals/tasks.json</code></li>
+      <li>This page is regenerated with <code>scripts/render_results.py</code>.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+const metrics = {{METRICS_JSON}};
+const root = document.getElementById("multiples");
+for (const metric of metrics) {
+  const max = Math.max(metric.codex, metric.lens) * 1.05;
+  const display = value => value.toFixed(metric.digits);
+  const row = (label, value, color) => `
+    <div class="bar" tabindex="0" aria-label="${label}: ${value}">
+      <div class="track"><div class="fill" style="--v:${value / max};--c:var(${color})"></div></div>
+      <output>${display(value)}</output>
+      <span class="tip">${label}: ${display(value)}</span>
+    </div>`;
+  root.insertAdjacentHTML("beforeend", `
+    <div class="metric"><h3>${metric.name}</h3><small>${metric.note}</small>
+      ${row("Codex", metric.codex, "--codex")}${row("Codex + Lens", metric.lens, "--lens")}
+    </div>`);
+}
+</script>
+</body>
+</html>

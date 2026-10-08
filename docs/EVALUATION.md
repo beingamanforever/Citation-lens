@@ -182,7 +182,11 @@ This supports a bounded quality advantage on this dataset, not a general speed a
 python evals/grade.py ../output/evals-v3/heldout-codex --out ../output/evals-v3/heldout-codex-audit-full --offline
 python evals/run.py --agent claude --split held_out --reps 2 --out ../output/evals-v3/heldout-claude
 python evals/grade.py ../output/evals-v3/heldout-claude
+python scripts/render_results.py
 ```
+
+The renderer creates `../output/citation-lens-results.html` from the exported Codex results.
+It preserves the concise interactive report and calculates its numbers from the saved data.
 
 ## Limits
 
