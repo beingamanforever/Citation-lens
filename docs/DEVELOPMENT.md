@@ -84,6 +84,10 @@ The release makes no new end-to-end performance claim.
 No fresh held-out run is started on a rejected performance candidate, and no favorable repetition replaces a failure.
 The Claude quality goal remains unmet.
 
+A subsequent [native-discovery workflow study](NATIVE_DISCOVERY_EXPERIMENT.md) was preregistered separately after v0.2.2.
+All 16 Claude attempts failed before research because the OAuth session had expired; Codex was left unrun and the prototype was not shipped.
+Its failure receipts are retained, and it does not reopen the three rejected performance candidates or establish a quality improvement.
+
 ## Evidence and reproduction
 
 [Baseline](results/development/baseline.json) · [Candidate 1](results/development/candidate-1.json) · [Candidate 2](results/development/candidate-2.json) · [Candidate 3](results/development/candidate-3.json)

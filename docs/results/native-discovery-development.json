@@ -1,0 +1,319 @@
+{
+  "schema_version": 1,
+  "experiment": "Native discovery with selective Lens enrichment",
+  "status": "authentication blocked; no research-quality evaluation",
+  "plan_recorded_utc": "2026-10-08T21:21:44.279679+00:00",
+  "base_commit": "d234d0feeff4ba3c8df62d1be6293ee5c629a44d",
+  "frozen_snapshots": {
+    "package": "fba1a628b86c47fd914a4632efb2bb2461a2419d0af5b80a08ad9506941057bc",
+    "runner": "5c0bc542c732b5ace10dc6accd5f34c327f9ddd2b8ab7844f34f7b204c6e74fb",
+    "grader": "4cd655631f6102e382179caddb35fbadea7ddb45228e04f5099ff5476e5bbe44",
+    "tasks": "da9badf201551d9bfc981f92d2a1cde97d7bd9d19fa1c472076a901d13a13164",
+    "evaluation": "398c5806e3b7153d3e6a97b8dd7ebd2729194aa03e4f082152568188745449fa"
+  },
+  "claude_conditions": {
+    "date": "2026-10-08",
+    "started": "2026-10-08T21:21:49+0000",
+    "agent": "claude",
+    "model": "claude-opus-5-5",
+    "effort": "high",
+    "jobs": 2,
+    "cache": "cold",
+    "deadline_seconds": 420,
+    "tool_budget": 8,
+    "max_papers": 25,
+    "selection": {
+      "split": "development",
+      "requested_tasks": [],
+      "tasks": [
+        "document_geometry",
+        "exact_attention",
+        "lora_lineage",
+        "base_prime_editing"
+      ]
+    },
+    "reps": 2,
+    "provider_keys": [],
+    "provider_health": {
+      "semantic_scholar_ok": "1/3",
+      "openalex_budget_left": "0",
+      "openalex_ok": "3/3",
+      "arxiv_ok": "3/3"
+    }
+  },
+  "claude_attempts": [
+    {
+      "task": "base_prime_editing",
+      "mode": "lens",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 1.2,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "base_prime_editing",
+      "mode": "lens",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 1.2,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "base_prime_editing",
+      "mode": "web",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 0.8,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "base_prime_editing",
+      "mode": "web",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 0.8,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "document_geometry",
+      "mode": "lens",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 2.2,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "document_geometry",
+      "mode": "lens",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 1.2,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "document_geometry",
+      "mode": "web",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 2.4,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "document_geometry",
+      "mode": "web",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 0.8,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "exact_attention",
+      "mode": "lens",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 1.2,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "exact_attention",
+      "mode": "lens",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 1.2,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "exact_attention",
+      "mode": "web",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 0.8,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "exact_attention",
+      "mode": "web",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 0.8,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "lora_lineage",
+      "mode": "lens",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 1.2,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "lora_lineage",
+      "mode": "lens",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 1.3,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "lora_lineage",
+      "mode": "web",
+      "rep": 1,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 0.8,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    },
+    {
+      "task": "lora_lineage",
+      "mode": "web",
+      "rep": 2,
+      "package": "fba1a628b86c",
+      "status": "process_error",
+      "seconds": 0.8,
+      "tool_calls": 0,
+      "exit_code": 1,
+      "errors": [
+        "Failed to authenticate: OAuth session expired and could not be refreshed"
+      ],
+      "answer_present": false,
+      "reported_input_tokens": 0,
+      "reported_output_tokens": 0
+    }
+  ],
+  "codex": {
+    "scheduled_attempts": 16,
+    "started_attempts": 0,
+    "reason": "study stopped after Claude authentication failure"
+  },
+  "grading": "not run; no research answers exist to evaluate",
+  "selection": "not earned; no completed Lens attempts",
+  "confirmation": "private corpus unread and unused",
+  "original_failed_attempts_replaced": false,
+  "prototype_shipped": false,
+  "notes": [
+    "All Claude attempts failed before research with an expired OAuth session.",
+    "Authentication failures do not measure retrieval quality, research latency or research cost.",
+    "Zero token counts are the CLI reports for these pre-inference failures.",
+    "All original records, logs, the frozen prototype, plan and patch are retained locally.",
+    "The released guide was restored after archiving; v0.2.2 is unchanged."
+  ]
+}
