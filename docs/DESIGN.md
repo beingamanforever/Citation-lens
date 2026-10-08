@@ -43,7 +43,8 @@ Lens expands one hop per call and lets the agent re-seed.
 | Similar papers | Semantic Scholar recommendations | finds prominent follow-ups a newest-first citer list misses |
 | Coupling data | one Semantic Scholar batch of reference IDs for up to 400 candidates | measures shared references |
 
-Records merge on arXiv ID, DOI, provider ID or exact long title; two different arXiv IDs never merge.
+Records merge on stable identifiers, or an exact long title with compatible author/year evidence and no conflicting identifiers.
+Two different arXiv IDs never merge.
 The arXiv abstract is preferred as verbatim text, and the larger citation count wins.
 
 ## Ranking
@@ -86,7 +87,8 @@ The previous design returned 45-120 KB per call, about 230 KB per attempt, and t
 
 ## Limits
 
-Keyless Semantic Scholar and arXiv throttle under load and OpenAlex's keyless budget is about 100 searches a day; free keys fix most of this.
+Keyless providers throttled during the evaluations.
+Optional API keys can increase provider access; their effect on research quality, latency and tokens has not been measured.
 A host that stays throttled through every retry is skipped for a minute, so a saturated provider costs one failed call rather than every call.
 Citation indexes lag new preprints.
 Similarity recommendations cover computer science only.

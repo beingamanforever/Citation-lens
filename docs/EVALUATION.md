@@ -1,12 +1,13 @@
 # Evaluation
 
-Question: does adding Citation Lens make Codex find more relevant, verified papers - including the foundations, the most influential follow-ups and the newest work - and more real citation links than Codex's own web search, under the same budget?
+Question: does adding Citation Lens make Codex or Claude Code find more relevant, verified papers - including the foundations, influential follow-ups and newest work - and more real citation links than the same host's native web research, under a matched budget?
 
 ## Protocol
 
-**Arms.** Both use the same Codex model and reasoning effort, prompt, output schema, deadline and call budget, and both keep native live web search.
+**Arms.** Each within-host comparison uses the same model and reasoning effort, prompt, output schema, deadline and call budget, and both arms keep native live web research.
 The lens arm adds the five Lens tools and their playbook (`skills/research/SKILL.md`).
-Each attempt starts from a fresh Codex home.
+Each Codex attempt starts from a fresh home.
+Claude attempts use fresh working directories, disable session persistence and external settings, and restrict tools to native web search/fetch plus Lens in the Lens arm.
 
 **Tasks.** [`evals/tasks.json`](../evals/tasks.json) holds 14 research requests: 4 development tasks for hill-climbing and 10 held-out tasks run once at the end.
 They span four kinds:
@@ -22,6 +23,7 @@ The task file contains 75 reference anchors, with 23 labeled recent.
 Agents never see anchors or the required-approach list.
 
 **Budget.** 420 seconds per attempt, at most 8 research tool calls, at most 25 papers.
+The call budget counts host tool calls; a Lens call can query several providers, so upstream request counts are not matched.
 The current runner checks the returned schema, call count, paper count and host completion status.
 Individual tool failures may be recovered from; host failures and exceeded budgets cannot count as completed answers.
 The answer lists papers (title, URL, role, reason, verbatim quote), citing -> cited links, a summary and gaps.
@@ -48,10 +50,13 @@ LLM judge (blinded):
   The judge never sees which arm proposed a paper.
 - **Pairwise.** The two answers are compared on coverage, foundations, recency, precision, synthesis and overall.
   Each pair is judged twice with the order swapped; a disagreement is a tie ([position bias][judge]).
+  Revision 3 masks explicit product/tool identifiers symmetrically in reasons, summaries and gaps before constructing judge prompts.
+  Scientific titles and source answers remain unchanged; workflow and writing style can still reveal an arm.
 
 Metrics per attempt: useful papers (found, right URL, relevance >= 1), core papers (relevance 2), precision, recent useful, prominent useful (>= 100 citations), anchor recall, approach coverage, verified citations between useful papers, quote verbatim rate, not-found and wrong-URL counts, seconds, tool calls, tokens, and bytes returned by Lens.
 
-**Lens beats native Codex** on a split when it wins more pairwise comparisons than it loses, finds more useful papers, more recent useful papers and more verified useful citations on average, without lower precision (by more than 0.05) or more unfound papers.
+**Lens beats a host's native research** on a split when it wins more pairwise comparisons than it loses, finds more useful papers, more recent useful papers and more verified useful citations on average, without lower precision (by more than 0.05) or more unfound papers.
+Completion rate, latency and token use remain separate outcomes; passing this quality rule does not establish a speed or cost advantage.
 
 ## Running
 
@@ -130,8 +135,7 @@ The original grader satisfied the stated decision rule.
 That is a preliminary result, not a verified release claim: the audit below found false-positive checks.
 The time comparison remains measured; token usage is missing for all three timed-out attempts.
 
-Claude Code login and a real Opus 5.5 request now succeed.
-The paired Claude comparison uses the same held-out tasks and within-host matched conditions; results will be reported after both arms and grading complete.
+Claude Code login and a real Opus 5.5 request succeeded, and the paired comparison is complete below.
 
 ### Verification audit
 
@@ -143,6 +147,8 @@ Two independent reviews reproduced the saved arithmetic and found these defects:
 - The report claimed 80 anchors rather than the 75 in the frozen task file.
 - Token aggregation treated missing timeout usage as zero.
 - Historical runs did not archive the runner, grader, raw judge votes or concurrency setting.
+- A later review found product/tool names in narrative fields sent to the pairwise judge.
+  Answer labels alone did not hide these identifiers; both hosts require the revision-3 pairwise correction.
 
 The responsible checks are repaired and covered by regression tests.
 Original runs and grades remain intact; corrected grading uses a new output directory and the unchanged tasks.
@@ -151,9 +157,10 @@ The measured package was `850d687aa043`; production fixes after that snapshot ne
 
 ### Corrected Codex grading
 
-The unchanged held-out answers were checked again with the repaired verifier and freshly blinded relevance and order-swapped judges.
+The unchanged held-out answers were checked again with the repaired verifier and fresh pooled relevance labels.
 An additional facts-only pass with the final verifier produced identical scores, papers, anchors and edge evidence.
-All 56 new judge requests and responses are saved locally; the 36 pairwise responses reproduce every retained swap vote.
+Revision 3 retained those relevance labels and reran all 36 pairwise judgments with explicit tool identifiers masked.
+The new grades preserve identical paper, citation, anchor and per-attempt scores; all earlier grades and judge archives remain intact.
 The [public results](results/codex-heldout.json) include the answers, paper-level labels, citation proofs and failure denominators.
 
 | Mean per attempt | Native Codex | Codex + Lens |
@@ -169,29 +176,62 @@ The [public results](results/codex-heldout.json) include the answers, paper-leve
 | Input tokens, attempts with reported usage | 275k | 386k |
 | Attempts missing token usage | 1 | 2 |
 
-The fresh overall judge records **17 Lens wins, 1 web win and 2 ties**.
+The revision-3 overall judge records **17 Lens wins, 1 web win and 2 ties**.
 Of 238 verified claimed edges, 155 use index reference records, 62 use identifiers in primary bibliography items, and 21 use complete title/author/year matches in primary items.
 These are distinct proof sources, not a claim that every link was checked in full text.
 The offline pass leaves 29 web and 19 Lens entries unverified; missing evidence is not proof that a URL is wrong.
 
 Lens meets the stated quality decision rule for these saved Codex attempts.
 It is slower, has one fewer completed answer, and its observed input-token mean is higher.
-This supports a bounded quality advantage on this dataset, not a general speed advantage or a measured Claude advantage.
+This supports a bounded Codex quality advantage on this dataset, with higher time and observed token use.
+
+### Claude Code results
+
+The same ten tasks ran twice per arm using `claude-opus-5-5` at high effort and frozen package `f48d89af2e38`.
+The GPT judge used medium effort; revision-3 masking and order swapping apply to both arms.
+All 20 relevance and 38 pairwise requests and responses are saved locally.
+The [public evidence](results/claude-heldout.json) includes every source answer, paper label, citation proof and swap vote.
+
+| Mean per attempt | Native Claude | Claude + Lens |
+| --- | ---: | ---: |
+| Useful papers, including adjacent work | 21.05 | 23.35 |
+| Directly relevant papers | 17.65 | 20.35 |
+| Recent useful papers | 7.70 | 8.10 |
+| Verified links between useful papers | 4.20 | 4.60 |
+| Precision, answered attempts | 0.909 | 0.944 |
+| Anchor recall | 0.848 | 0.778 |
+| Quotes matched verbatim | 73.8% | 94.7% |
+| Completed attempts | 19 / 20 | 20 / 20 |
+| Seconds | 131 | 126 |
+| Input tokens, including cached | 47k | 109k |
+
+The overall judge records **7 Lens wins, 10 web wins and 3 ties**.
+Lens fails the declared quality rule on pairwise judgment despite passing its other conditions.
+Native Claude also recovers more reference anchors and prominent papers; Lens uses about 2.31 times the processed input tokens.
+Cached tokens are included, so this is not a measured billing comparison.
+The native battery-cycle-life repetition exceeded eight calls; its original answer remains saved but receives zero quality credit and forfeits.
+No Claude token usage is missing.
+
+Of 198 verified claimed edges, 25 use index references, 116 use primary bibliography identifiers and 57 use primary title/author/year evidence.
+The verification cache reuses earlier paper evidence equally for both arms; inference caches remain cold and separate.
+These inspected tasks now serve as regression cases for future product changes, rather than independent held-out confirmation.
 
 ```bash
-python evals/grade.py ../output/evals-v3/heldout-codex --out ../output/evals-v3/heldout-codex-audit-full --offline
+python evals/grade.py ../output/evals-v3/heldout-codex --out ../output/evals-v3/heldout-codex-correction --offline
 python evals/run.py --agent claude --split held_out --reps 2 --out ../output/evals-v3/heldout-claude
-python evals/grade.py ../output/evals-v3/heldout-claude
+python evals/grade.py ../output/evals-v3/heldout-claude --out ../output/evals-v3/heldout-claude-correction
 python scripts/render_results.py
 ```
 
-The renderer creates `../output/citation-lens-results.html` from the exported Codex results.
-It preserves the concise interactive report and calculates its numbers from the saved data.
+The renderer creates `../output/citation-lens-results.html` from the exported results, with Codex and Claude tabs.
+It calculates every metric from the saved data and labels regressions explicitly.
+Until a host's graded export exists, its tab shows a pending message without estimated metrics.
 
 ## Limits
 
-- **Same model family.** The judge is the same model as both agents.
-  Self-preference therefore affects both arms alike, but labels are not human-calibrated.
+- **Model-based judgment.** The Codex comparison uses a GPT judge from the agents' own model family.
+  The Claude comparison uses that GPT judge for both Opus arms.
+  Order swapping controls position bias; labels are not human-calibrated and other judge biases can remain.
 - **Sampling.** One or two runs per task measure an average, not a guarantee.
 - **Throttling.** Keyless providers can throttle mid-run; affected attempts are kept and reported, not dropped.
 - **Incomplete anchors.** Anchors are a small must-have set; other relevant papers earn credit only through the relevance judge.

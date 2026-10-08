@@ -31,6 +31,7 @@ def main():
                 "max_papers",
                 "jobs",
                 "cache",
+                "provider_keys",
             )
         },
         "packages": sorted({attempt["package"] for attempt in attempts}),
@@ -53,10 +54,12 @@ def main():
             }
             for attempt in attempts
         ],
-        "grading": {
+        "grading": {"relevance_labels_reused": bool(grades.get("labels_from"))}
+        | {
             key: grades.get(key)
             for key in (
                 "grading_revision",
+                "pairwise_anonymization",
                 "offline",
                 "pairwise_rerun",
                 "judge",

@@ -8,7 +8,8 @@
   "tool_budget": 8,
   "max_papers": 25,
   "jobs": null,
-  "cache": null
+  "cache": null,
+  "provider_keys": null
  },
  "packages": [
   "850d687aa043"
@@ -9009,7 +9010,9 @@
   }
  ],
  "grading": {
-  "grading_revision": 2,
+  "relevance_labels_reused": true,
+  "grading_revision": 3,
+  "pairwise_anonymization": "explicit_tool_names",
   "offline": true,
   "pairwise_rerun": true,
   "judge": {
@@ -9115,19 +9118,19 @@
      "tie": 6
     },
     "recency": {
-     "lens": 16,
+     "lens": 17,
      "web": 1,
-     "tie": 3
+     "tie": 2
     },
     "precision": {
-     "lens": 6,
+     "lens": 5,
      "web": 3,
-     "tie": 11
+     "tie": 12
     },
     "synthesis": {
-     "lens": 8,
-     "web": 3,
-     "tie": 9
+     "lens": 7,
+     "web": 2,
+     "tie": 11
     },
     "overall": {
      "lens": 17,
@@ -10307,7 +10310,7 @@
      "foundations": "lens",
      "recency": "lens",
      "precision": "tie",
-     "synthesis": "lens",
+     "synthesis": "tie",
      "overall": "lens"
     },
     "votes": [
@@ -10324,13 +10327,13 @@
       "foundations": "lens",
       "recency": "lens",
       "precision": "tie",
-      "synthesis": "lens",
+      "synthesis": "tie",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B provides stronger coverage of operating-condition extrapolation, changing usage, degradation interpretation and experimental charging optimization. It retains the central Severson and Attia foundations while adding probabilistic prognostics, ageing knees and field-deployment perspectives. Its recent selection spans more relevant advances, although A uniquely includes Discovery Learning and PBT. Both lists are relevant and index-verified, supporting a precision tie. B better distinguishes prediction targets, optimization objectives and generalization evidence, and explicitly acknowledges its abstract-level screening limitations.",
-     "A covers all four required approaches more thoroughly, especially operating-condition extrapolation, changing usage, degradation features, and experimental-budget allocation. Both include Severson and Attia; A adds influential probabilistic prognostics, interpretable prediction, knees, and field-deployment work. A’s recent coverage is broader and includes September 2026 experiment design, although B contributes valuable omissions such as Discovery Learning and PBT. Precision is comparable: all papers and checked links are verified, and neither list contains clear duplicates or substantial irrelevant material. A provides the stronger comparison of prediction targets, charging objectives, and generalization limits, including quantitative interpolation/extrapolation evidence and explicit disclosure of its abstract-based review limitations."
+     "B better covers operating-condition extrapolation, variable usage, feature-based charging optimization and sequential experiment design. It adds useful probabilistic, mechanistic and field-deployment foundations, plus broader recent work. Its synthesis distinguishes charging objectives and provides a concrete interpolation–extrapolation comparison. A contributes notable 2026 prediction papers and strong transfer caveats. Both have verified, largely relevant references, so precision is tied.",
+     "A covers all required approaches more thoroughly, particularly operating-condition extrapolation, variable usage, feature-based charging optimization and cost-aware experiment design. It includes more influential supporting works and broader relevant coverage within the recent window. B adds valuable recent papers on Discovery Learning, pretrained transformers and physics-constrained charging. Both lists are verified and relevant. Their syntheses are comparably useful: A distinguishes prediction targets and optimization objectives, while B emphasizes target-label dependence, validation splits and uncertainty."
     ]
    },
    {
@@ -10350,40 +10353,6 @@
       "foundations": "lens",
       "recency": "lens",
       "precision": "lens",
-      "synthesis": "tie",
-      "overall": "lens"
-     },
-     {
-      "coverage": "lens",
-      "foundations": "lens",
-      "recency": "lens",
-      "precision": "lens",
-      "synthesis": "tie",
-      "overall": "lens"
-     }
-    ],
-    "reasons": [
-     "B covers all required approaches more broadly, adding mechanistic degradation foundations, field-data limitations, and a direct experimental closed-loop charging follow-up. Its recent coverage includes dynamic cycling, formation-stage prediction, industrial cell designs, and cost-aware experiment selection. B also has cleaner verified links. Both provide strong, appropriately qualified synthesis: A excels on hidden failure modes and intrinsic cell variability; B adds concrete generalization evidence and practical diagnostic limitations.",
-     "A more comprehensively covers all four required approaches, adds foundational impedance and mechanistic diagnostics papers, and offers broader recent coverage, notably dynamic cycling, formation-stage prediction, and cost-aware experiment design. Its references are fully verified; B has one mismatched URL and one unverified URL. Synthesis is comparable: A provides quantitative generalization evidence and practical validation gaps, while B more sharply distinguishes protocol effects, intrinsic cell variability, and failure modes without early observable signals."
-    ]
-   },
-   {
-    "task": "direct_air_capture_sorbents",
-    "rep": 1,
-    "winner": {
-     "coverage": "lens",
-     "foundations": "lens",
-     "recency": "lens",
-     "precision": "lens",
-     "synthesis": "tie",
-     "overall": "lens"
-    },
-    "votes": [
-     {
-      "coverage": "lens",
-      "foundations": "lens",
-      "recency": "lens",
-      "precision": "lens",
       "synthesis": "lens",
       "overall": "lens"
      },
@@ -10392,21 +10361,21 @@
       "foundations": "lens",
       "recency": "lens",
       "precision": "lens",
-      "synthesis": "tie",
+      "synthesis": "web",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B provides broader relevant coverage, adding early amine-MOF and COF foundations, humidity-aware screening, and coadsorption, climate, and contactor analyses. Its recent papers span more experimental framework alternatives and practical operating conditions. Verification is stronger: no unverified URLs and 31/31 citation links verified, although both answers contain one mismatched URL. Both distinguish ambient humid-air evidence from higher-concentration capture, but B more fully connects material performance, durability, process design, cost, and net removal. A contributes useful complementary screening and process papers.",
-     "A covers all required approaches more thoroughly, adding foundational amine-MOF and COF studies, humidity-aware screening, and broader plant analyses. Its recent coverage includes more experimental framework advances alongside computational and process work. A also has stronger link verification, although both contain one mismatched URL. Both accurately distinguish humid ambient-air evidence from higher-concentration tests and explain material-to-process gaps. B adds valuable amine-durability and optimized-cycle comparisons, but A is the stronger research starting point."
+     "B covers all required approaches more fully, adding mechanistic degradation foundations, a direct closed-loop charging follow-up, field-data limitations, and recent dynamic-cycling and cost-aware experiment-design studies. Its citations are better verified, and its synthesis gives concrete generalization evidence and clearly identifies supporting diagnostic papers. A offers valuable recent work on unseen conditions and prediction limits, plus a sharper distinction between protocol effects and intrinsic cell variability, but B provides the stronger overall battery research review.",
+     "A covers all required approaches more comprehensively, includes stronger mechanistic and diagnostic foundations, and adds substantial recent work on dynamic cycling, battery-design transfer, formation features, and cost-aware experiment design. Its fully verified references also outweigh B’s mismatched and unverified URLs. B offers sharper distinctions between protocol effects and intrinsic cell variability, observable degradation and unobservable failures, and simulation versus experimental evidence. Overall, A provides the stronger research bibliography."
     ]
    },
    {
     "task": "direct_air_capture_sorbents",
-    "rep": 2,
+    "rep": 1,
     "winner": {
      "coverage": "lens",
-     "foundations": "tie",
+     "foundations": "lens",
      "recency": "lens",
      "precision": "tie",
      "synthesis": "tie",
@@ -10418,7 +10387,41 @@
       "foundations": "lens",
       "recency": "lens",
       "precision": "tie",
+      "synthesis": "lens",
+      "overall": "lens"
+     },
+     {
+      "coverage": "lens",
+      "foundations": "lens",
+      "recency": "lens",
+      "precision": "tie",
       "synthesis": "tie",
+      "overall": "lens"
+     }
+    ],
+    "reasons": [
+     "B covers all required approaches more fully, adding early amine-MOF and COF foundations, humidity-aware screening, coadsorption modeling, climate-dependent optimization, and contactor design. Its recent-window coverage includes more experimental framework advances and process studies, with clearer dates. Both distinguish humid ambient-air evidence from higher-concentration tests and have comparable verified citation accuracy. B better connects materials, durability, screening, and plant performance; A contributes useful complementary work on diamine aging, sorbent economics, and regeneration.",
+     "A provides broader coverage of amine-MOF development, early chemisorbing COFs, humidity-aware screening, and plant optimization. It also includes more substantial recent experimental framework studies and computational and contactor advances. Both distinguish humid ambient-air capture from higher-concentration tests and explain material-to-process limitations honestly. Their verification records show comparable citation-quality issues, with no unindexed papers. B adds valuable amine-durability, sorbent-economics, and regeneration-focused studies, but A better satisfies the full request."
+    ]
+   },
+   {
+    "task": "direct_air_capture_sorbents",
+    "rep": 2,
+    "winner": {
+     "coverage": "lens",
+     "foundations": "tie",
+     "recency": "lens",
+     "precision": "tie",
+     "synthesis": "web",
+     "overall": "lens"
+    },
+    "votes": [
+     {
+      "coverage": "lens",
+      "foundations": "lens",
+      "recency": "lens",
+      "precision": "tie",
+      "synthesis": "web",
       "overall": "lens"
      },
      {
@@ -10431,8 +10434,8 @@
      }
     ],
     "reasons": [
-     "B covers more relevant experimental MOF advances, structured sorbents, pilot demonstrations, computational methods, and contactor optimization. It adds foundational TVSA and sorbent-focused economic studies and substantially stronger 2025–2026 experimental coverage. Both bibliographies are relevant and index-verified, and both carefully distinguish humid ambient-air evidence from higher-concentration capture, predictions, and modeled costs. A contributes useful weather-dependent process modeling and a particularly clear ultramicroporous humidity benchmark, but B better serves the full request.",
-     "A offers broader relevant coverage, including MOF-808, additional COFs, structured sorbents, computational design, and contactor optimization, plus substantially more work within the recent window. Both include the defining MOF studies and influential plant assessments, with complementary foundational additions. Both are well focused and distinguish predictions from demonstrations; B’s single unverified URL does not establish a dubious paper. B provides a sharper humidity comparison, especially its explicit warning that 1,000–10,000-ppm breakthrough does not demonstrate ambient-air capture. A’s broader, verified bibliography makes it more useful overall."
+     "B covers all required approaches more broadly, adding humid-air MOFs, structured sorbents, pilot demonstrations, screening methods, and contactor optimization. It also includes more important 2025–2026 experimental and computational work and additional foundational process studies. Precision is comparable: every paper is indexed, neither answer has a confirmed mismatched URL, and both distinguish predictions from demonstrations. A provides a tighter comparison and more actionable research gaps, especially its warning that 1,000–10,000 ppm tests do not establish ambient-air performance. B’s broader relevant coverage and stronger recent literature make it better overall.",
+     "A offers broader relevant coverage, especially newer frameworks, computational screening methods, structured sorbents, and recent process optimization. Both include the defining MOF mechanisms and major dataset and plant assessments, with complementary foundational additions. A covers more work within the requested recent window. Verification supports both bibliographies without a clear precision advantage. B provides a tighter comparison and explicitly distinguishes humid tests at 1,000–10,000 ppm from ambient-air evidence. A’s broader coverage and recent literature make it more useful overall."
     ]
    },
    {
@@ -10465,8 +10468,8 @@
      }
     ],
     "reasons": [
-     "B covers more substantive loss generalizations and adds relevant 2025–2026 work. Both include the key RLHF/PPO foundations and core reference-free and unpaired objectives. A is more tightly focused; B includes OLMo 3 without checking its preference objectives. B provides clearer comparisons and stronger citation support, though only 2/21 links were verified versus A’s 0/19. Neither fully satisfies the supported-citation requirement.",
-     "A covers more loss-generalization follow-ups and extends recent coverage into 2025–2026, while both include the defining PPO/RLHF foundations and main reference-free and unpaired objectives. Both have verified paper identities and relevant selections. A better acknowledges uncertainty about objectives and citation relationships, with 2 verified citation links versus B’s 0. Neither provides a well-supported citation graph, but A offers the stronger lineage map overall."
+     "B covers the shared core lineage plus more substantive loss generalizations and later open-model work, including OLMo 3 and a 2026 production-DPO analysis. Both include the essential RLHF/PPO foundations. A is more focused, with fewer peripheral or incompletely connected additions. B offers a fuller comparison and clearer chronological caveats, but citation support remains weak: only 2/21 links were verified, versus A’s 0/19, and OLMo 3’s preference objectives were not checked.",
+     "A covers more substantive loss generalizations and adds OLMo 3 and a 2026 production-DPO analysis, giving it stronger recent coverage. Both include the defining RLHF/PPO foundations and core reference-free and unpaired objectives, with similarly clean bibliographic records. A more explicitly distinguishes predecessors, objective changes, and publication-date caveats. Direct citation support remains weak in both: only 2/21 links were verified for A and 0/19 for B."
     ]
    },
    {
@@ -10499,8 +10502,8 @@
      }
     ],
     "reasons": [
-     "B better maps the lineage by adding GPO, f-DPO, and BCO, plus helpful/harmless RLHF and Zephyr. Its synthesis distinguishes loss generalization, divergence changes, reference removal, and unpaired feedback more fully. Both cover the same main recent open recipes; APO’s 2025 journal publication does not establish a newer research contribution. Both lists are relevant and index-verified. B has more verified citation links, but support remains sparse in both (3/16 versus 1/14), so neither fully delivers the requested direct-citation lineage.",
-     "A covers more of the requested lineage, notably GPO, divergence generalization, and BCO, and adds the influential helpful/harmless RLHF foundation. Both include the same three recent open recipes and have index-verified, relevant entries. A offers a broader comparison and more verified citation links, though both citation graphs remain weak (3/16 versus 1/14). B usefully highlights that large-scale adoption beyond DPO was not established."
+     "B adds key loss and divergence generalizations (GPO, f-DPO), unpaired-feedback work (BCO), and influential foundations and applications (Helpful/Harmless RLHF, Zephyr). Both cover the same principal recent open recipes; APO’s 2025 journal date does not establish a new recent contribution. Both lists are relevant with similar verification quality. B provides a fuller comparison and clearer caveats, with more verified citation links, though neither adequately supports the requested citation graph or comprehensively covers 2026.",
+     "A covers the requested lineage more fully with GPO, f-DPO, and BCO, and adds the influential helpful/harmless RLHF foundation. Both identify the same three recent open post-training recipes; A’s APO journal date does not establish newer research. Both have clean indexed paper lists and similar URL uncertainty. A better distinguishes loss, divergence, reference-free, and unpaired-feedback branches and has more verified citation links (3 versus 1), although neither adequately supports the full citation graph."
     ]
    },
    {
@@ -10510,31 +10513,31 @@
      "coverage": "lens",
      "foundations": "tie",
      "recency": "lens",
-     "precision": "lens",
+     "precision": "tie",
      "synthesis": "tie",
      "overall": "lens"
     },
     "votes": [
      {
       "coverage": "lens",
-      "foundations": "tie",
+      "foundations": "lens",
       "recency": "lens",
-      "precision": "lens",
-      "synthesis": "tie",
+      "precision": "tie",
+      "synthesis": "lens",
       "overall": "lens"
      },
      {
       "coverage": "lens",
-      "foundations": "lens",
+      "foundations": "tie",
       "recency": "lens",
-      "precision": "lens",
+      "precision": "tie",
       "synthesis": "web",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B covers all required approaches more broadly, adding SAPO, CISPO, and substantial recent work on normalization, aggregation, and stability. Both include the defining GRPO papers and major early follow-ups. B has stronger URL verification; both lists contain real, unique papers. Both distinguish objective changes from training recipes and caution against incompatible evaluations. A offers sharper detail on several mechanisms, while B provides a broader taxonomy and explicitly separates execution systems. B is the better overall research starting point.",
-     "A covers all required approaches more comprehensively, including influential SAPO and CISPO and substantially more recent normalization, length-bias, and stability work. Both include the core foundations, but A provides a stronger follow-up map. A also has fully verified URLs, whereas B has two unverified URLs; neither has unindexed papers. B offers slightly sharper synthesis through explicit Dr. GRPO normalization changes, concrete examples of incompatible training setups, and careful limits on binary-reward and MoE generalization. Both appropriately separate objective changes from training recipes and acknowledge incomplete verification."
+     "B covers all required approaches more broadly, adding SAPO, CISPO, normalization theory, and explicitly identified training-system papers. Both include the original GRPO paper and the central R1, Dr. GRPO, DAPO, and GSPO works; B provides a fuller influential-method reading list. B also covers more relevant 2026 developments. Precision is comparable: all papers were found in indexes, neither list has misdirected URLs, and B labels its broader infrastructure and theoretical scope clearly. B better synthesizes competing normalization arguments, distinguishes objective changes from execution changes, and explicitly warns against conflating avg@32 with pass@32. Both honestly acknowledge incomplete verification and incompatible experimental setups.",
+     "A covers all required approaches more comprehensively, adding SAPO, CISPO, several normalization and stability methods, and explicitly identified training-system papers. Both include the defining GRPO paper and central influential follow-ups. A offers broader relevant coverage within the recent window. Index verification establishes no clear precision winner; neither has missing or misdirected papers, and citation verification is limited for both. B provides sharper synthesis, explicitly explaining Dr. GRPO’s removal of standard-deviation normalization, GSPO’s length-normalized sequence ratios, and concrete evaluation incompatibilities. A’s broader coverage and clear objective-versus-system distinction make it the stronger overall research starting point."
     ]
    },
    {
@@ -10545,7 +10548,7 @@
      "foundations": "tie",
      "recency": "lens",
      "precision": "tie",
-     "synthesis": "lens",
+     "synthesis": "tie",
      "overall": "lens"
     },
     "votes": [
@@ -10561,14 +10564,14 @@
       "coverage": "lens",
       "foundations": "tie",
       "recency": "lens",
-      "precision": "tie",
-      "synthesis": "lens",
+      "precision": "lens",
+      "synthesis": "tie",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B covers more normalization, baseline-estimation, homogeneous-group collapse, and asynchronous-stability approaches, with broader 2026 coverage. Both include the defining GRPO paper and principal influential follow-ups. Both lists are relevant and index-verified; A’s shorter list does not establish greater precision. B more explicitly distinguishes meanings of length bias, objective changes from system changes, and sampled accuracy from pass@k, while clearly acknowledging limited citation verification. A adds valuable entropy-control and concise-reasoning work, but B better serves the full request.",
-     "A provides broader relevant coverage of normalization, baseline estimation, homogeneous-group failures, length aggregation, and asynchronous stability, especially in 2026. Both include the defining GRPO paper and principal influential follow-ups; B adds useful entropy and concise-reasoning work. Index checks establish equally clean paper identification, so breadth alone does not reduce A’s precision. A more fully distinguishes objectives, reward estimators, and training systems, explicitly explains avg@32 versus pass@32, and reports its limited citation verification more transparently. Neither ranks incompatible benchmark results."
+     "B covers the core objectives plus a broader range of normalization, baseline estimation, homogeneous-reward collapse, and asynchronous stability work, with substantially more 2026 coverage. Both include the defining and major influential papers, and neither has index-identified invalid or misdirected entries. B more clearly separates objective changes from systems contributions and explains evaluation incompatibilities and verification limits. A offers a strong, focused complement, particularly on entropy control and concise reasoning.",
+     "A covers more directly relevant normalization, baseline estimation, homogeneous-group failure, and asynchronous stability work, with substantially broader 2026 coverage. Both include the defining GRPO paper and major influential follow-ups. A has stronger verified citation support; unverified citation relationships in B are a limitation, not proof of falsehood. Both distinguish objective changes from training systems and avoid incompatible benchmark comparisons. B adds useful entropy-collapse and concise-reasoning papers, but A better serves the requested breadth."
     ]
    },
    {
@@ -10579,7 +10582,7 @@
      "foundations": "lens",
      "recency": "lens",
      "precision": "web",
-     "synthesis": "web",
+     "synthesis": "tie",
      "overall": "lens"
     },
     "votes": [
@@ -10588,7 +10591,7 @@
       "foundations": "lens",
       "recency": "lens",
       "precision": "web",
-      "synthesis": "web",
+      "synthesis": "lens",
       "overall": "lens"
      },
      {
@@ -10596,13 +10599,13 @@
       "foundations": "lens",
       "recency": "lens",
       "precision": "web",
-      "synthesis": "web",
+      "synthesis": "tie",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B provides broader coverage, adding DeepCT, DeepImpact, Matryoshka compression, sparse-search systems, and multilingual and instructed evaluation, plus more work within the recent window. A is more reliable on citation relationships: 9/9 verified versus B’s 9/18, with clearer acknowledgment of its limited citation evidence. Both distinguish first-stage retrieval from cross-encoder reranking well. B’s breadth makes it the stronger overall reading list, but its unsupported citation links need correction.",
-     "A offers broader coverage across all four approaches, adding DeepCT, DeepImpact, Matryoshka, Seismic, and multilingual and instructed evaluation. It also covers more recent work across compression, retrieval engines, and benchmarks. B is more precise: all 9 citation links are verified, versus 9 of 18 for A, and its efficiency studies, compression evaluation, and reproducibility audit support a tighter comparison. Both correctly distinguish first-stage retrieval from cross-encoder reranking and acknowledge gaps. A’s broader foundational and recent coverage makes it the stronger overall research starting point."
+     "B covers all four approaches more broadly, adding DeepCT, DeepImpact, Matryoshka, sparse-search systems, and more evaluation benchmarks. It also includes more work within the recent window and better distinguishes candidate rescoring from cross-encoder reranking. A wins precision: all 9 citation links are verified, versus only 9 of B’s 18. B’s broader, useful coverage outweighs that weakness overall, but its unverified citation relationships should not be relied on.",
+     "A covers all four approaches more broadly, adding DeepCT, DeepImpact, Matryoshka, sparse search systems, and multilingual and instructed evaluation. It also includes more work within the specified recent window. B offers valuable efficiency audits and compression evaluation, and its citation support is stronger: 9/9 verified links versus A’s 9/18, despite one unverified URL. Both clearly distinguish first-stage retrieval from cross-encoder reranking and acknowledge comparison gaps. A’s broader foundational and recent coverage gives it the overall advantage."
     ]
    },
    {
@@ -10613,21 +10616,21 @@
      "foundations": "tie",
      "recency": "lens",
      "precision": "tie",
-     "synthesis": "web",
+     "synthesis": "tie",
      "overall": "tie"
     },
     "votes": [
      {
-      "coverage": "lens",
+      "coverage": "tie",
       "foundations": "lens",
       "recency": "lens",
       "precision": "tie",
-      "synthesis": "web",
+      "synthesis": "tie",
       "overall": "lens"
      },
      {
       "coverage": "web",
-      "foundations": "tie",
+      "foundations": "web",
       "recency": "lens",
       "precision": "lens",
       "synthesis": "web",
@@ -10635,8 +10638,8 @@
      }
     ],
     "reasons": [
-     "B offers broader efficiency coverage, especially dense quantization, sparse-index compression, pruning, and GPU retrieval. DeepCT, DeepImpact, and JPQ strengthen its foundations, while its recent papers span more retrieval-system and compression advances. A is stronger on retrieval-specific evaluation, including BRIGHT and lsr_benchmark, and more clearly explains first-stage retrieval, distillation, and comparison requirements. Precision is comparable: all papers are indexed, B has cleaner URL verification, and A has a higher verified citation-link proportion. Neither citation graph is fully verified.",
-     "B offers better-balanced coverage through SPLADE++/v3, EMVB, and retrieval-specific efficiency and reasoning benchmarks. Both cover the central foundations, with complementary strengths. A spans recent compression and retrieval-engine advances more broadly and has no unverified URLs. B provides clearer evaluation guidance, explicitly distinguishes retrieval from reranking and distillation, and grounds citation relationships in linked primary sources. Both citation graphs remain only partially verified; B is the stronger overall research starting point."
+     "B offers stronger historical sparse-retrieval foundations through DeepCT and DeepImpact, dedicated quantization coverage through JPQ, and broader recent compression and retrieval-engine work. A counters with stronger retrieval evaluation coverage, including BRIGHT and lsr_benchmark, plus SPLADE++ and EMVB. Precision is balanced: B has fully verified URLs, while A has a higher proportion of verified citation links; neither contains missing or mislinked papers. Both accurately distinguish retrieval from cross-encoder reranking and acknowledge incomplete citation evidence and evaluation gaps. B wins overall by a modest margin.",
+     "B offers stronger evaluation coverage (lsr_benchmark and BRIGHT), important SPLADE++/v3 follow-ups, and EMVB compression, making it the better research starting point. Its synthesis more clearly separates retrieval, reranking, and distillation and provides concrete citation sources. A has broader recent compression and retrieval-engine coverage and cleaner URL verification. Citation support remains incomplete in both: 10/19 links verified for A and 10/17 for B."
     ]
    },
    {
@@ -10646,8 +10649,8 @@
      "coverage": "lens",
      "foundations": "lens",
      "recency": "lens",
-     "precision": "tie",
-     "synthesis": "tie",
+     "precision": "lens",
+     "synthesis": "lens",
      "overall": "lens"
     },
     "votes": [
@@ -10655,7 +10658,7 @@
       "coverage": "lens",
       "foundations": "lens",
       "recency": "lens",
-      "precision": "tie",
+      "precision": "lens",
       "synthesis": "lens",
       "overall": "lens"
      },
@@ -10663,14 +10666,14 @@
       "coverage": "lens",
       "foundations": "lens",
       "recency": "lens",
-      "precision": "tie",
-      "synthesis": "tie",
+      "precision": "lens",
+      "synthesis": "lens",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B provides a more complete map, adding FGN/WeatherNext 2, FourCastNet 3, FuXi-ENS, Prithvi, foundation-model transfer studies, and WeatherBench 2. It also covers more important 2025–2026 developments and clearly compares ensemble methods, deployment status, and ECMWF evaluation limitations. Both lists are relevant and index-verified, supporting a precision tie. A contributes valuable operational version details and observation-based evaluations, but its omissions make it less useful overall.",
-     "A covers the requested transitions more fully, adding FGN/WeatherNext 2, FourCastNet 3, FuXi-ENS, Prithvi and concrete foundation-model transfer work. It also includes stronger foundational evaluation references and broader recent methodological and extremes research. Both lists are relevant and index-verified. Both explain historical ECMWF baseline limitations well; B balances A’s broader synthesis with clearer 2026 operational updates and observation-based verification. A is the better overall literature map."
+     "B covers all required approaches more fully, adding FGN/WeatherNext 2, FuXi-ENS, FourCastNet 3, Prithvi and direct foundation-model transfer. WeatherBench 2 and additional influential deterministic models strengthen its foundations; its 2025–2026 ensemble and evaluation papers improve recency. Both lists contain indexed papers, but B has substantially better citation verification. B also compares probabilistic methods clearly and distinguishes ECMWF operations, commercial deployment and research results while qualifying historical baseline wins. A contributes valuable station-based verification and ECMWF version details, but its literature map is narrower.",
+     "A provides the stronger literature map, adding FGN/WeatherNext 2, FourCastNet 3, FuXi-ENS, Prithvi and concrete foundation-model transfer work. It also includes WeatherBench 2 and more foundational deterministic studies, plus broader 2025–2026 ensemble and extremes research. Its citation verification is substantially stronger. A more fully compares ensemble objectives, deployment status and limitations of ECMWF benchmark claims. B contributes useful observation-based evaluations and newer ECMWF version information, but omits several central developments."
     ]
    },
    {
@@ -10718,8 +10721,8 @@
      }
     ],
     "reasons": [
-     "B covers all required approaches more fully, adding Sequoia, LayerSkip, and broader recent work on diffusion drafting, approximate acceptance, scheduling, and multi-head proposals. Both include the core foundations, but B provides a stronger influential-paper set. B also has no mismatched URLs and better citation verification (8/13 versus 6/15). Its synthesis more clearly distinguishes Medusa’s acceptance modes, greedy equivalence, checkpoint-relative exactness, and unaudited correctness claims. A contributes useful recent tree-training and delayed-expansion papers absent from B, but B serves the researcher better overall.",
-     "A covers all required approaches more fully, adding influential Sequoia and LayerSkip work and broader 2025–2026 coverage, including diffusion drafting and explicitly approximate decoding. Both include the central foundational papers. A better distinguishes Medusa’s exact and approximate modes and qualifies unaudited correctness claims. Its citation support is stronger (8/13 verified versus 6/15), with no mismatched URLs. B adds useful training and tree-expansion papers, but offers narrower coverage and less reliable citation support."
+     "B covers all required approaches with greater breadth, adding Sequoia, LayerSkip, diffusion drafting, and explicitly approximate Fuzzy Speculative Decoding. It retains the core foundational papers and offers broader 2025–2026 coverage. Verification favors B: no incorrect or unverified URLs and 8/13 verified citation links versus A’s 6/15. B also better distinguishes proposal architecture, greedy equivalence, exact sampling, and checkpoint-relative correctness, while flagging unaudited guarantees. A contributes useful recent tree-optimization papers, but its narrower coverage and weaker citation support make it less useful overall.",
+     "A covers all required approaches more broadly, adds influential works such as Sequoia and LayerSkip, and includes more substantial 2025–2026 developments. Its verification record is stronger: no problematic URLs and 8/13 supported citation links versus B’s 6/15. A also distinguishes Medusa’s exact and approximate modes more fully and is more cautious about unaudited correctness claims. Both include the central foundational papers, but A provides the stronger overall research map."
     ]
    },
    {
@@ -10752,8 +10755,8 @@
      }
     ],
     "reasons": [
-     "B covers the required approaches more fully, adding SpecTr, block verification, self-speculation, and broader recent tree-acceptance and approximate methods. It better connects foundational acceptance theory to newer work and distinguishes stochastic exactness, greedy preservation, and checkpoint-relative guarantees. Both bibliographies are clean and relevant, but B has stronger verified citation support (6/11 versus 5/16). A provides a useful explicit acceptance formula and several distinctive recent papers, but B offers the stronger research map overall.",
-     "A covers all required approaches more fully, adding SpecTr, block verification, self-speculation, and LayerSkip to the shared foundations. It also provides broader recent coverage across drafting, tree acceptance, and approximate verification. Both lists contain indexed papers with valid URLs, but A has stronger citation-link verification (6/11 versus 5/16); B also has an inconsistent year for its evaluation paper. B gives a useful acceptance formula, while A more thoroughly distinguishes stochastic exactness, greedy-output preservation, and approximate acceleration, and states correctness-proof gaps explicitly."
+     "B covers all required approaches more comprehensively, adding SpecTr, self-speculation, Lookahead, and block-verification theory. Its recent selection offers broader tree-acceptance and approximate-verification coverage, although A contributes useful unique recent papers. Both lists contain only indexed papers with valid URLs, but B has stronger verified citation support (6/11 versus 5/16); A overstates its citation evidence. B more clearly distinguishes exact sampling, greedy-output preservation, approximate acceptance, and checkpoint-relative guarantees, while candidly identifying unaudited proofs and coverage gaps.",
+     "A covers all required approaches more thoroughly, adding SpecTr, block verification, self-speculation, and several recent tree-acceptance and approximate methods. Its foundational and recent coverage is stronger. Both have fully indexed, correctly linked papers, but A has better citation-link verification (6/11 versus 5/16); B also gives inconsistent years for its evaluation paper. A more clearly separates exact sampling, greedy-output preservation, and approximate acceptance, and acknowledges unverified correctness claims. B provides a useful acceptance formula and distinctive recent papers, but its blanket claim of explicit citation support is less credible given the verification results."
     ]
    },
    {
@@ -10773,7 +10776,7 @@
       "foundations": "lens",
       "recency": "lens",
       "precision": "lens",
-      "synthesis": "lens",
+      "synthesis": "tie",
       "overall": "lens"
      },
      {
@@ -10786,8 +10789,8 @@
      }
     ],
     "reasons": [
-     "B adds relevant DeltaProduct, FG²-GDN and ReGLA results, broader foundations, and primary-source Qwen3-Next deployment details. It better connects memory editing, transition expressivity and production hybridization, while distinguishing conference results from reports and preprints. Its URLs are fully verified. A contributes Falcon-H1, Nemotron Nano and Log-Linear Attention, but leaves Qwen deployment less resolved. B’s truncated ending and abstract-only Qwen3.8-Next evidence are limitations; neither fully covers Qwen3.5.",
-     "A covers more of the relevant research lineage, including S4, DeltaProduct, recent fine-grained delta updates, and primary Qwen3-Next documentation. Its citations are also more thoroughly verified. B adds useful production examples and gives clearer quantitative comparisons and limitations; its synthesis is complete, whereas A’s closing discussion is truncated. Overall, A’s broader coverage of directly relevant advances makes it the stronger survey."
+     "B better connects the required families, adding S4, DeltaProduct, recent GLA refinements, and primary-source Qwen3-Next deployment details. Its recent research coverage is stronger, although A includes useful production releases and Log-Linear Attention absent from B. B also has cleaner verified links and explicitly limits its abstract-only Qwen3.8-Next evidence. Synthesis is a tie: B explains recall and state-tracking mechanisms more fully; A provides stronger concrete inference comparisons and a complete discussion of confounds, whereas B’s ending is truncated. Both distinguish conference results from technical reports and acknowledge hybrid attention’s remaining quadratic prefill cost.",
+     "A offers broader relevant coverage, adding S4, DeltaProduct, FG²-GDN, and newer Qwen architecture evidence, with stronger verified-link reliability. B adds useful Falcon-H1 and Nemotron Nano coverage, but omits important recurrence advances. B’s synthesis is clearer and complete, with concrete performance comparisons and sharper experimental limitations; A’s closing discussion is truncated. Both distinguish peer-reviewed research from technical reports."
     ]
    },
    {
@@ -10820,8 +10823,8 @@
      }
     ],
     "reasons": [
-     "B covers more important 2025–26 models and recurrence refinements, adds S4 and influential state-tracking analyses, and better distinguishes recall, state tracking, and inference efficiency. It also more clearly separates conference results from reports and contextualizes production speedups. A narrowly wins precision through a tighter, directly relevant selection and no unverified URLs. B’s broader, more current and better integrated survey serves the researcher better overall.",
-     "A covers more of the required landscape, adds S4 and state-tracking foundations, and includes substantially more 2026 developments and production hybrids. Its synthesis better distinguishes associative recall, state tracking, and inference efficiency, while labeling publication uncertainty. B is more tightly focused, avoids adjacent material such as Titans, and has no unverified URLs, but omits important recent models and leaves Gated DeltaNet’s peer-reviewed status unresolved."
+     "B covers more important 2025–26 deployments and memory refinements, adds S4 and state-tracking foundations, and better distinguishes associative recall from state tracking. It also more clearly separates conference results from technical reports and explains efficiency confounders. A is slightly more focused, with fewer adjacent entries. The trusted index checks support both bibliographies; B’s advantage comes from substantive coverage, not paper count alone.",
+     "A covers all required approaches more fully, adds S4 and key state-tracking foundations, and includes substantially more important 2026 refinements and production models. Its synthesis better distinguishes associative recall, state tracking, and inference efficiency while qualifying hybrid costs and publication status. B is more focused and has no unverified URLs, giving it a slight precision advantage, but omits major later releases and leaves Gated DeltaNet’s established peer-review status unresolved. Both appropriately caution that production speedups involve confounding architectural and serving changes."
     ]
    },
    {
@@ -10845,7 +10848,7 @@
     "winner": {
      "coverage": "lens",
      "foundations": "lens",
-     "recency": "tie",
+     "recency": "lens",
      "precision": "tie",
      "synthesis": "tie",
      "overall": "lens"
@@ -10854,8 +10857,8 @@
      {
       "coverage": "lens",
       "foundations": "lens",
-      "recency": "tie",
-      "precision": "lens",
+      "recency": "lens",
+      "precision": "tie",
       "synthesis": "lens",
       "overall": "lens"
      },
@@ -10863,14 +10866,14 @@
       "coverage": "lens",
       "foundations": "lens",
       "recency": "lens",
-      "precision": "tie",
+      "precision": "lens",
       "synthesis": "web",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B covers more defining datasets and model families, including GraphTSR, GTE/FinTabNet, LGPMA, and logical-coordinate regression. Its synthesis better explains supplied-cell assumptions, annotation correction, dataset provenance, and scan exclusions. Verification also favors B: fewer problematic URLs and more verified citation links, although both have citation weaknesses. Recent coverage is balanced: A adds directly relevant full-page/multi-page extraction and newer recognizers; B adds transformer, VLLM, and diagnostic/pipeline evaluation work while distinguishing older conference publications from later index dates.",
-     "A covers more influential transformer, graph, regression, segmentation, dataset, and evaluation work, and offers broader recent benchmark coverage while flagging older publication dates. B gives sharper source-based comparisons of leakage, unequal OCR inputs, and metric differences, though A also explains substantial limitations. Precision is comparable: both have no unindexed papers and one mismatched URL; B has an additional unverified URL, while A includes more peripheral material. A is the stronger literature map overall; B provides the clearer evaluation critique."
+     "B covers more defining datasets, early detection methods, transformer models, and graph, mask, and logical-coordinate alternatives. Its recent papers broaden diagnostic and end-to-end evaluation, and it explicitly distinguishes older conference work from later index dates. B also explains input assumptions, dataset provenance, and scan-exclusion limitations more clearly. Precision is comparable: A is more focused, while B has better verified source support; both contain a misdirected URL and incomplete text.",
+     "A covers more relevant transformer, graph, regression, segmentation, dataset, and evaluation work, including more foundational papers and substantial recent benchmarks. Its verification record is slightly stronger: both have one misdirected URL, but B also has an unverified URL. B provides the clearer, complete synthesis, with particularly useful source-backed discussion of split leakage, unequal OCR inputs, and metric differences; A’s limitations discussion ends mid-sentence. Overall, A offers the stronger literature map, though it omits B’s important PubTables-v2 contribution."
     ]
    },
    {
@@ -10897,14 +10900,14 @@
       "coverage": "lens",
       "foundations": "lens",
       "recency": "lens",
-      "precision": "web",
+      "precision": "tie",
       "synthesis": "web",
       "overall": "lens"
      }
     ],
     "reasons": [
-     "B covers all required approaches with a broader, relevant set of influential papers and substantially stronger recent coverage, including GPTQv2, Qronos and 2026 developments. It better distinguishes weight-only, joint quantization and calibration-time optimization, and accurately separates preprint dates from conference publication dates. Its limitations are more method-specific and its verification gaps more candid. Precision is comparable: both have unique, indexed papers; A is more focused, while B has no unverified URLs. Citation-link verification remains limited for both.",
-     "A covers all required approaches more broadly, includes more influential outlier and joint-quantization comparators, and offers substantially stronger coverage within the recent window while distinguishing preprint from conference dates. B is more focused and technically specific, with clearer, source-linked limitations and carefully bounded claims. Both cover the essential foundations; A’s additional relevant foundational works and recent advances make it the stronger research starting point."
+     "B covers all required approaches with a broader relevant lineage, adding OmniQuant, OWQ, GPTVQ, and joint-quantization comparators. It includes substantially more work within the recent window and correctly distinguishes preprint dates from later conference publication. Its synthesis better explains inherited reconstruction errors, calibration-time optimization, deployment overhead, and unassessed recent experiments. Precision is comparable: both contain indexed papers without wrong-paper URLs, and B clearly labels its boundary cases. A is focused and provides useful source-supported limitations, but offers narrower coverage.",
+     "A covers all required approaches more comprehensively and adds influential methods such as OmniQuant, OWQ and QuaRot. Its recent coverage is substantially stronger, including GPTQv2, Qronos and several indexed 2026 papers; B counts LRQ’s 2025 publication despite its earlier preprint. Precision is comparable: both contain real, relevant papers without duplicates or mismatched URLs. B provides clearer, more carefully qualified limitations and source-linked comparisons, although citation verification is weak for both. A’s broader methodological and recent coverage makes it more useful overall."
     ]
    },
    {
@@ -10937,8 +10940,8 @@
      }
     ],
     "reasons": [
-     "B covers all four required approaches with a broader, relevant selection, including OWQ, GPTVQ, VPTQ, and QTIP, and adds influential calibration and rotation comparators. Its 2025–2026 coverage is substantially stronger, and it consistently distinguishes first release from later publication. B also better connects quantization regimes to inference workloads and explains accumulated calibration error, effective storage, codebook growth, and preparation costs. Precision is tied: both have unique, index-confirmed papers and clearly label weight-only versus weight-and-activation methods; the verification counts alone do not establish citation accuracy. Both limitation sections end mid-sentence, but B provides the stronger usable synthesis.",
-     "A covers all required approaches more thoroughly, includes more influential follow-ups, and offers substantially stronger recent coverage. Its comparison better explains workload differences, calibration costs, storage overhead, and codebook deployment limitations. B candidly acknowledges its incomplete recent search and uncertain LRQ dating, but leaves important developments out. Precision is comparable: both lists are relevant and index-confirmed; B’s one unverified URL does not establish an error. Both limitation sections end abruptly."
+     "B covers all four required approaches with more useful follow-ups, while retaining A’s core foundational papers. Its recent coverage is substantially broader and explicitly uses first-release dates. B also better explains weight-only versus weight-and-activation workloads, calibration error, effective storage costs, and codebook deployment limitations. Precision is tied: both contain unique, indexed papers without known mismatched URLs; B’s additional comparison papers are relevant. Both have weak citation-link verification and truncated limitations sections, so their detailed claims still warrant checking.",
+     "A covers all four required approaches with more relevant connections, adds influential methods such as OmniQuant and OWQ, and provides substantially broader recent-window coverage. Its synthesis better explains workload differences, accumulated calibration error, storage overhead, optimization costs, and codebook deployment limits. B offers useful evaluation caveats and candidly acknowledges incomplete recent coverage and LRQ’s uncertain first-release date. Precision is tied: both lists contain indexed papers without known wrong-paper URLs, and the verification notes provide little basis for distinguishing citation reliability. Both answers end mid-sentence."
     ]
    }
   ],

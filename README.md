@@ -47,22 +47,27 @@ In Claude Code you can also run `/citation-lens:research <topic>`.
 The goal is more relevant papers and trustworthy citations than the host's default web research, under a matched budget.
 Quality, completion rate, time and tokens are measured separately.
 
-A corrected Codex evaluation covers 10 held-out tasks, twice each.
-The blinded judge favored Lens in **17 pairs**, with one loss and two ties.
-The saved answers were regraded after fixing URL, quote and citation checks ([protocol and limits](docs/EVALUATION.md), [papers and evidence](docs/results/codex-heldout.json)).
+Each host was tested on 10 held-out tasks, twice each, under matched conditions.
+After verification repairs and masking explicit tool names, the order-swapped judge favored Lens in **17 Codex pairs**, with one loss and two ties.
+For **Claude Code, Lens won seven, lost ten and tied three**.
+It does not meet our Claude quality goal yet: higher paper counts came with lower must-find recall and more input tokens.
 
-| Mean per attempt | Codex | Codex + Lens |
-| --- | ---: | ---: |
-| Directly relevant papers | 13.1 | 19.2 |
-| Recent useful papers | 5.6 | 9.1 |
-| Verified links between useful papers | 2.7 | 8.5 |
-| Completed attempts | 19 / 20 | 18 / 20 |
-| Seconds | 258 | 335 |
+| Mean per attempt | Codex | Codex + Lens | Claude | Claude + Lens |
+| --- | ---: | ---: | ---: | ---: |
+| Directly relevant papers | 13.1 | 19.2 | 17.7 | 20.4 |
+| Recent useful papers | 5.6 | 9.1 | 7.7 | 8.1 |
+| Verified links between useful papers | 2.7 | 8.5 | 4.2 | 4.6 |
+| Must-find recall | 0.707 | 0.732 | 0.848 | 0.778 |
+| Completed attempts | 19 / 20 | 18 / 20 | 19 / 20 | 20 / 20 |
+| Seconds | 258 | 335 | 131 | 126 |
+| Reported input tokens, including cached | 275k | 386k | 47k | 109k |
 
-Lens took about 30% longer in this run.
-Reported input-token usage was also higher; timed-out attempts did not report usage, so total consumed tokens are unknown.
-These measurements used keyless providers and an earlier package snapshot.
-The paired Claude Code comparison is running; a measured Claude advantage is not established yet.
+Failed attempts receive zero quality credit.
+Three Codex timeouts lack token usage; token means exclude them.
+These are keyless, snapshot-specific measurements with model-based judges.
+Inspected tasks become regression cases for future changes; new behavior needs fresh held-out evidence.
+
+[Protocol, failures and reproduction](docs/EVALUATION.md) · [Codex evidence](docs/results/codex-heldout.json) · [Claude evidence](docs/results/claude-heldout.json)
 
 [Design and research basis](docs/DESIGN.md) · [Privacy](docs/PRIVACY.md) ·
 [Development](docs/PUBLISHING.md) · [MIT license](LICENSE)

@@ -50,7 +50,7 @@ from citation_lens.papers import (  # noqa: E402
     keys,
 )
 from citation_lens.storage import Store  # noqa: E402
-from run import CODEX  # noqa: E402
+from run import CODEX, TOOLS  # noqa: E402
 
 PROMINENT = 100  # citations that make a paper "prominent" in the report
 LABEL_SCHEMA = {
@@ -633,18 +633,30 @@ def judge_relevance(attempts, tasks, model, effort, jobs, archive=None):
     return labels
 
 
+def mask_tool_names(text):
+    # Mask treatment identifiers in narrative fields only; scientific titles and
+    # the retained source answers remain unchanged.
+    pattern = (
+        r"\b(?:mcp__citation[-_]lens__)?(?:"
+        + "|".join(re.escape(tool) for tool in TOOLS)
+        + r"|Citation[\s_-]+Lens|Lens(?=\s+(?:reference|citation)[\s-])"
+        + r"|WebSearch|WebFetch|web_search|web\.run)\b"
+    )
+    return re.sub(pattern, "[research tool]", text, flags=re.IGNORECASE)
+
+
 def describe_answer(record, labels):
     answer = record["answer"] or {}
     lines = [
         f"{i}. {e['title']} ({e['paper']['year'] if e['paper'] else '?'}) "
-        f"[{e['role']}] - {e['reason']}"
+        f"[{e['role']}] - {mask_tool_names(e['reason'])}"
         for i, e in enumerate(record["entries"], 1)
     ]
     return (
         "\n".join(lines)
-        + f"\n\nSummary: {answer.get('summary', '')[:2500]}"
+        + f"\n\nSummary: {mask_tool_names(answer.get('summary', ''))[:2500]}"
         + "\nGaps: "
-        + "; ".join(answer.get("gaps", []))[:1200]
+        + "; ".join(mask_tool_names(gap) for gap in answer.get("gaps", []))[:1200]
     )
 
 
@@ -1021,7 +1033,8 @@ def main():
                     for r in attempts
                 },
                 "judge": {"model": args.model, "effort": args.effort},
-                "grading_revision": 2,
+                "grading_revision": 3,
+                "pairwise_anonymization": "explicit_tool_names",
                 "source_run": str(source),
                 "offline": args.offline,
                 "labels_from": str(args.labels_from) if args.labels_from else None,

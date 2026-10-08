@@ -10,12 +10,57 @@ from grade import (
     Resolver,
     bibliography_match,
     check_facts,
+    describe_answer,
+    mask_tool_names,
     quote_text,
     same_title,
     score,
     summarize,
     url_identifier,
 )  # noqa: E402
+
+
+def test_pair_description_masks_tool_names_symmetrically_without_mutating_answers():
+    import copy
+
+    record = {
+        "answer": {
+            "summary": "Citation Lens found O(n^2) attention; WebSearch returned 25 papers.",
+            "gaps": ["research_expand failed; WebFetch failed; sources remain partial."],
+        },
+        "entries": [
+            {
+                "title": "Lens Imaging with O(n^2) Attention",
+                "paper": {"year": 2025},
+                "role": "foundation",
+                "reason": "mcp__citation-lens__research_search found -5% memory usage.",
+            }
+        ],
+    }
+    original = copy.deepcopy(record)
+    web = dict(record, mode="web")
+    lens = dict(record, mode="lens")
+    description = describe_answer(web, {})
+    assert description == describe_answer(lens, {})
+    assert "Citation Lens" not in description and "research_expand" not in description
+    assert "WebSearch" not in description and "WebFetch" not in description
+    assert "mcp__" not in description
+    assert "Lens Imaging with O(n^2) Attention" in description
+    assert "-5% memory usage" in description
+    assert "sources remain partial" in description
+    assert record == original
+
+
+def test_tool_masking_covers_contract_names_without_masking_scientific_lenses():
+    names = "research_search research_expand research_graph research_read research_visual"
+    assert mask_tool_names(names) == " ".join(["[research tool]"] * 5)
+    assert mask_tool_names("citation-lens CITATION_LENS web.run web_search") == " ".join(
+        ["[research tool]"] * 4
+    )
+    assert mask_tool_names("An optical lens focuses light.") == "An optical lens focuses light."
+    assert mask_tool_names("Lens reference edges remain partial.") == (
+        "[research tool] reference edges remain partial."
+    )
 
 
 @pytest.mark.parametrize(

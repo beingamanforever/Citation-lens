@@ -6,7 +6,9 @@ compact cards with verbatim snippets, and a new paired evaluation against native
 
 The corrected Codex evaluation records 17 Lens wins, one web win and two ties.
 It finds more relevant papers and verified links, with higher time and observed token use.
-The Claude comparison is running; its outcome is not claimed yet.
+The completed Claude comparison records seven Lens wins, ten web wins and three ties.
+Lens returns more useful papers but loses must-find coverage and uses more input tokens; it does not meet the Claude quality goal.
+Both hosts' pairwise judgments were corrected to mask explicit tool identifiers, and all earlier evidence is preserved.
 
 Restart the host after updating: the five tool names remain, with a revised interface.
 Search accepts query/provider lists, expansion walks one hop and can be re-seeded, and reading selects `abstract`, `outline` or `text` with optional batches.
