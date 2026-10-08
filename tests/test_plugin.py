@@ -1204,6 +1204,8 @@ def test_expand_retains_completed_doi_page_when_next_page_times_out(tmp_path, mo
                     "direction": "backward",
                     "limit": 60,
                 },
+                # SDK delivery and CI scheduling are outside the 1.4s metadata deadline.
+                read_timeout_seconds=timedelta(seconds=5),
             )
             body = json.loads(result.content[0].text)
             assert not result.isError
