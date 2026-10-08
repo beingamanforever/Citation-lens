@@ -50,6 +50,7 @@ class Web:
         self.locks: dict[str, asyncio.Lock] = {}
         self.next_at: dict[str, float] = {}
         self.pending: dict[str, asyncio.Task] = {}
+        self.waiters: dict[str, int] = {}
         self.requests = 0
         self.hits = 0
         # Interactive defaults: give up quickly. Batch jobs such as grading can be patient.
@@ -72,6 +73,7 @@ class Web:
         if key not in self.pending:
             self.pending[key] = asyncio.create_task(self._download(url, body, max_bytes))
         task = self.pending[key]
+        self.waiters[key] = self.waiters.get(key, 0) + 1
         try:
             data = await asyncio.shield(task)
             if len(data) > max_bytes:
@@ -79,8 +81,15 @@ class Web:
             self.store.put(key, data, ttl)
             return data
         finally:
-            if task.done():
+            remaining = self.waiters[key] - 1
+            if remaining:
+                self.waiters[key] = remaining
+            else:
+                self.waiters.pop(key)
                 self.pending.pop(key, None)
+                if not task.done():
+                    task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
 
     async def _download(self, url, body, max_bytes):
         original_host = urlsplit(url).hostname
@@ -107,7 +116,6 @@ class Web:
                     async with self.locks.setdefault(host, asyncio.Lock()):
                         await asyncio.sleep(max(0, self.next_at.get(host, 0) - time.monotonic()))
                         self.next_at[host] = time.monotonic() + interval
-                    self.requests += 1
                     request_url, request_headers, extensions = url, dict(headers), {}
                     if host not in ("api.openalex.org", "api.semanticscholar.org", "r.jina.ai"):
                         address = await public_url(url)
@@ -119,29 +127,30 @@ class Web:
                     try:
                         # Hold a connection slot only while a request is in flight, never
                         # while backing off, so one throttled provider cannot stall the rest.
-                        async with (
-                            self.slots,
-                            self.client.stream(
+                        async with self.slots:
+                            if (wait := self.down_until.get(host, 0) - time.monotonic()) > 0:
+                                raise RuntimeError(f"{host}: throttled; skipped for {wait:.0f}s")
+                            self.requests += 1
+                            async with self.client.stream(
                                 "POST" if body else "GET",
                                 request_url,
                                 json=body,
                                 headers=request_headers,
                                 extensions=extensions,
-                            ) as response,
-                        ):
-                            status, response_headers = response.status_code, response.headers
-                            if status in (429, 500, 502, 503, 504) or response.is_redirect:
-                                pass
-                            elif status >= 400:
-                                raise RuntimeError(f"{host}: HTTP {status}")
-                            else:
-                                chunks, size = [], 0
-                                async for chunk in response.aiter_bytes():
-                                    size += len(chunk)
-                                    if size > max_bytes:
-                                        raise ValueError("Remote response exceeds byte limit")
-                                    chunks.append(chunk)
-                                return b"".join(chunks)
+                            ) as response:
+                                status, response_headers = response.status_code, response.headers
+                                if status in (429, 500, 502, 503, 504) or response.is_redirect:
+                                    pass
+                                elif status >= 400:
+                                    raise RuntimeError(f"{host}: HTTP {status}")
+                                else:
+                                    chunks, size = [], 0
+                                    async for chunk in response.aiter_bytes():
+                                        size += len(chunk)
+                                        if size > max_bytes:
+                                            raise ValueError("Remote response exceeds byte limit")
+                                        chunks.append(chunk)
+                                    return b"".join(chunks)
                     except httpx.TransportError:
                         if attempt == self.attempts - 1:
                             raise RuntimeError(f"{host}: network request failed") from None

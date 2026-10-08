@@ -27,6 +27,12 @@ TASK = {
     "required_approaches": ["secret approach"],
 }
 
+ALTERNATE_TASK = TASK | {
+    "name": "fresh",
+    "prompt": "Find fresh papers on exact attention.",
+    "split": "held_out",
+}
+
 
 def valid_answer():
     return {
@@ -263,7 +269,9 @@ def test_run_attempt_never_accepts_process_or_native_failure(
     assert record["answer"] == valid_answer() and record["status"] == expected
 
 
-def invoke_main(monkeypatch, project, out, attempts, reps=1, jobs=1):
+def invoke_main(
+    monkeypatch, project, out, attempts, reps=1, jobs=1, task_name="t", tasks_path=None
+):
     def fake_attempt(task, mode, rep, args, today):
         name = f"{task['name']}-{mode}-r{rep}"
         attempts.append(name)
@@ -280,24 +288,160 @@ def invoke_main(monkeypatch, project, out, attempts, reps=1, jobs=1):
 
     monkeypatch.setattr(runner, "ROOT", project)
     monkeypatch.setattr(runner, "run_attempt", fake_attempt)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "run.py",
-            "--out",
-            str(out),
-            "--task",
-            "t",
-            "--modes",
-            "web",
-            "--reps",
-            str(reps),
-            "--jobs",
-            str(jobs),
-        ],
-    )
+    argv = [
+        "run.py",
+        "--out",
+        str(out),
+        "--task",
+        task_name,
+        "--modes",
+        "web",
+        "--reps",
+        str(reps),
+        "--jobs",
+        str(jobs),
+    ]
+    if tasks_path is not None:
+        argv.extend(("--tasks", str(tasks_path)))
+    monkeypatch.setattr(sys, "argv", argv)
     runner.main()
+
+
+def write_tasks(path, tasks):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"tasks": tasks}))
+
+
+def test_alternate_task_dataset_is_selected_and_frozen(tmp_path, monkeypatch):
+    project = make_project(tmp_path / "project")
+    external_tasks = tmp_path / "private" / "heldout-v4.json"
+    write_tasks(external_tasks, [ALTERNATE_TASK])
+    out = tmp_path / "results"
+    attempts = []
+
+    invoke_main(
+        monkeypatch,
+        project,
+        out,
+        attempts,
+        task_name="fresh",
+        tasks_path=external_tasks,
+    )
+
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert attempts == ["fresh-web-r1"]
+    assert (out / "tasks.json").read_bytes() == external_tasks.read_bytes()
+    assert (out / "tasks.json").read_bytes() != (project / "evals/tasks.json").read_bytes()
+    assert manifest["selection"]["tasks"] == ["fresh"]
+    assert str(external_tasks) not in json.dumps(manifest)
+
+
+@pytest.mark.parametrize(
+    ("names", "message"),
+    [
+        (["same", "same"], "Duplicate task name"),
+        (["/tmp/escape"], "Invalid task name"),
+        (["../escape"], "Invalid task name"),
+        ([""], "Invalid task name"),
+        (["C:escape"], "Invalid task name"),
+        (["research:alternate"], "Invalid task name"),
+        (["task", "Task"], "Invalid task name"),
+        (["con"], "Invalid task name"),
+        (["lpt9"], "Invalid task name"),
+    ],
+)
+def test_invalid_external_task_names_are_rejected_before_run_mutation(
+    tmp_path, monkeypatch, names, message
+):
+    project = make_project(tmp_path / "project")
+    external_tasks = tmp_path / "private" / "unsafe.json"
+    write_tasks(external_tasks, [ALTERNATE_TASK | {"name": name} for name in names])
+    out = tmp_path / "results"
+    attempts = []
+
+    with pytest.raises(SystemExit, match=message):
+        invoke_main(
+            monkeypatch,
+            project,
+            out,
+            attempts,
+            task_name=names[0],
+            tasks_path=external_tasks,
+        )
+
+    assert attempts == []
+    assert not out.exists()
+
+
+def test_changed_external_task_dataset_rejects_resume_without_overwriting(tmp_path, monkeypatch):
+    project = make_project(tmp_path / "project")
+    external_tasks = tmp_path / "private" / "heldout-v4.json"
+    write_tasks(external_tasks, [ALTERNATE_TASK])
+    out = tmp_path / "results"
+    attempts = []
+    invoke_main(
+        monkeypatch,
+        project,
+        out,
+        attempts,
+        task_name="fresh",
+        tasks_path=external_tasks,
+    )
+    frozen = (out / "tasks.json").read_bytes()
+    manifest = (out / "manifest.json").read_bytes()
+    result = (out / "attempts/fresh-web-r1.json").read_bytes()
+
+    write_tasks(external_tasks, [ALTERNATE_TASK | {"prompt": "Changed prompt."}])
+    with pytest.raises(SystemExit, match="tasks snapshot.*new --out"):
+        invoke_main(
+            monkeypatch,
+            project,
+            out,
+            attempts,
+            reps=2,
+            task_name="fresh",
+            tasks_path=external_tasks,
+        )
+
+    assert (out / "tasks.json").read_bytes() == frozen
+    assert (out / "manifest.json").read_bytes() == manifest
+    assert (out / "attempts/fresh-web-r1.json").read_bytes() == result
+    assert not (out / "attempts/fresh-web-r2.json").exists()
+
+
+def test_tampered_frozen_alternate_dataset_rejects_resume(tmp_path, monkeypatch):
+    project = make_project(tmp_path / "project")
+    external_tasks = tmp_path / "private" / "heldout-v4.json"
+    write_tasks(external_tasks, [ALTERNATE_TASK])
+    out = tmp_path / "results"
+    attempts = []
+    invoke_main(
+        monkeypatch,
+        project,
+        out,
+        attempts,
+        task_name="fresh",
+        tasks_path=external_tasks,
+    )
+    manifest = (out / "manifest.json").read_bytes()
+    frozen_tasks = out / "tasks.json"
+    frozen_tasks.write_text(frozen_tasks.read_text() + "\n")
+    tampered = frozen_tasks.read_bytes()
+
+    with pytest.raises(SystemExit, match="frozen run snapshot changed.*new --out"):
+        invoke_main(
+            monkeypatch,
+            project,
+            out,
+            attempts,
+            reps=2,
+            task_name="fresh",
+            tasks_path=external_tasks,
+        )
+
+    assert frozen_tasks.read_bytes() == tampered
+    assert (out / "manifest.json").read_bytes() == manifest
+    assert not (out / "attempts/fresh-web-r2.json").exists()
 
 
 def test_run_snapshot_is_immutable_and_resume_only_adds_repetitions(tmp_path, monkeypatch):

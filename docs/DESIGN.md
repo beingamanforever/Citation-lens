@@ -2,6 +2,7 @@
 
 Goal: given a research question, return more relevant, verified papers than an agent's own web search - the foundations, the most influential follow-ups and the newest work - with citation links that can be checked.
 Fast, and without flooding the agent's context.
+This is the objective, not a guarantee: the historical Codex comparison passed, the Claude comparison and three later development candidates did not.
 
 ## Principles
 
@@ -16,21 +17,32 @@ Fast, and without flooding the agent's context.
   Failed or throttled providers are reported, never silently dropped.
 - **Recency is a lane, not a tie-break.** Citation counts lag; every result list reserves room for the last two years, including arXiv preprints too new for citation indexes.
 
-## The paradigm: search, expand, screen, verify
+## The paradigm: discover, connect, verify
 
 ```mermaid
 flowchart LR
-    Q[Question] --> S[research_search<br/>2-4 variants x 3 providers]
-    S --> P[Pick 3-6 seeds]
-    P --> E[research_expand<br/>refs, citers, similar]
-    E --> L[foundation / follow-up / recent lanes]
-    L --> V[research_read / research_visual<br/>only what cards cannot settle]
-    V --> A[Answer with quotes and citation edges]
-    L -. missing approach .-> P
+    Q[Question] --> S[research_search<br/>short query variants]
+    S --> C[Screen papers and provider coverage]
+    C --> E[research_expand<br/>verified seeds, one hop]
+    E --> L[foundation / follow-up / recent]
+    L --> V[Selective evidence read]
+    V --> A[Answer with quotes and verified edges]
+    C -. unavailable providers or missing approach .-> W[Native primary-source discovery]
+    W --> I[Verified DOI or arXiv ID]
+    I --> V
+    E -. index references unavailable .-> B[Primary arXiv bibliography]
+    B --> L
 ```
 
 Citation expansion is the most consistently supported recall lever in agentic literature search: removing PaSa's expansion step cut recall by 23-32% ([PaSa][pasa]); one-hop expansion lifted BM25 recall@20 from 50.0 to 68.6 on LitSearch ([LitSearch][litsearch]); SPAR keeps expansion shallow because deeper chains drift off topic ([SPAR][spar]).
 Lens expands one hop per call and lets the agent re-seed.
+The playbook keeps the earlier few-call plan: search once, expand verified seeds once, read only unsettled evidence, then write.
+Broad surveys and lineages can screen one 60-card neighborhood; additional pages reuse its saved graph rather than rebuild it.
+Read only unsettled evidence in a batch.
+Failed providers and missing approaches remain coverage gaps.
+Native discoveries with verified DOI or arXiv identifiers go directly to reading, without repeating title searches against an unavailable index.
+Primary arXiv bibliographies can recover backward references during index outages; they do not supply forward citations or complete citation coverage.
+The answer's paper limit is a ceiling, not a quota.
 
 ## Providers
 
@@ -38,19 +50,37 @@ Lens expands one hop per call and lets the agent re-seed.
 | --- | --- | --- |
 | Relevance search | Semantic Scholar, OpenAlex, arXiv | fused with reciprocal rank fusion |
 | Fresh preprints | arXiv sorted by submission date | not yet in citation indexes |
-| References | Semantic Scholar, OpenAlex fallback | OpenAlex lacks reference lists for many ML preprints |
+| References | Semantic Scholar, OpenAlex, then primary arXiv HTML when both are unavailable | explicit bibliography identifiers provide checkable backward links |
 | Citing papers | Semantic Scholar (newest 1000), OpenAlex (most cited, overall and last two years) | S2 lists citers newest-first; OpenAlex sorts by citations |
 | Similar papers | Semantic Scholar recommendations | finds prominent follow-ups a newest-first citer list misses |
 | Coupling data | one Semantic Scholar batch of reference IDs for up to 400 candidates | measures shared references |
 
+When both indexes lack a reference list, arXiv seeds can use explicit DOI/arXiv links inside individual HTML bibliography entries.
+Already cached records resolve immediately; one bounded arXiv metadata batch resolves additional preprints without repeating unavailable index queries.
+Uncached DOI-only entries remain unresolved.
+Each recovered edge carries its matched identifier and primary bibliography fragment; similar papers still do not become citation edges.
+The fallback inspects at most 100 entries per seed, hydrates at most 100 distinct uncached arXiv identifiers per expansion, and reports omitted, ambiguous and unresolved entries.
+Unavailable HTML is a visible gap, rather than evidence of an empty bibliography.
+Reference lookups allow eight seconds each for Semantic Scholar and OpenAlex, then twelve seconds for primary arXiv retrieval and metadata hydration, inside the existing thirty-second caller deadline.
+The common index bounds keep a stalled journal seed from blocking recovered arXiv neighbors.
+They reduce index patience for journal-only seeds; end-to-end development runs must measure that tradeoff.
+The tested development bundles failed the saved retention rule; primary-reference recovery is a verified capability, not evidence of an overall research gain.
+
 Records merge on stable identifiers, or an exact long title with compatible author/year evidence and no conflicting identifiers.
 Two different arXiv IDs never merge.
 The arXiv abstract is preferred as verbatim text, and the larger citation count wins.
+Optional publisher DOI metadata from the [arXiv Atom feed](https://info.arxiv.org/help/api/user-manual.html) stays attached to the preprint, so identifiers already supported by that source can join cached publication and bibliography records.
+Search and expansion save their full fused paper records before trimming snapshot previews, so later reads reuse the same identities and evidence.
+Requested-version bibliography navigation remains separate from canonical paper metadata, keeping a latest abstract from being attached to an older version URL.
+Batch reading returns a cached record with a nonblank title and abstract without optional identity or citation-count enrichment; missing evidence still uses provider resolution.
+This avoids unnecessary metadata requests but can leave cached citation counts unknown or stale until another workflow refreshes them.
+Reference lookup continues to accept native arXiv and DOI identifiers.
 
 ## Ranking
 
 Search: `0.45 * fused rank + 0.25 * query match + 0.30 * citation percentile`, interleaved two relevance cards to one recent card.
-Strict-AND providers (OpenAlex, arXiv) get the first four content words of a query so long phrasings still match.
+Strict-AND providers (OpenAlex, arXiv) retain every content term and quoted phrase.
+The agent can refine an over-specific query explicitly; Lens does not silently discard its final concepts.
 
 Expansion follows Connected Papers, which ranks by co-citation and bibliographic coupling ([about][cp]), and Inciteful, which weights shared references by Adamic/Adar ([Inciteful][inciteful]):
 
@@ -72,7 +102,7 @@ Lanes are interleaved round-robin; each card names its lane and why it was chose
 
 ## Context budget
 
-Measured in the evaluation runs (development iteration 4 and held-out):
+Measured in the historical evaluation runs (development iteration 4 and held-out), not the current package:
 
 | Response | Size |
 | --- | --- |
@@ -84,12 +114,15 @@ Measured in the evaluation runs (development iteration 4 and held-out):
 Each card carries one verbatim abstract sentence chosen for the query, so the agent can quote evidence without another call.
 Pages clamp to 60 cards and 120 edges, keeping the links that touch seeds and top-ranked cards.
 The previous design returned 45-120 KB per call, about 230 KB per attempt, and timed out in two of three attention trials.
+The final later development candidate returned about 100 KB per Lens attempt but processed substantially more input tokens than its baseline.
+Smaller tool payloads and fewer provider requests do not establish lower end-to-end token use; [development results](DEVELOPMENT.md) retain that regression.
 
 ## Limits
 
 Keyless providers throttled during the evaluations.
 Optional API keys can increase provider access; their effect on research quality, latency and tokens has not been measured.
 A host that stays throttled through every retry is skipped for a minute, so a saturated provider costs one failed call rather than every call.
+An abandoned request stops its downloads and retries; a coalesced download continues while another caller still needs it.
 Citation indexes lag new preprints.
 Similarity recommendations cover computer science only.
 The graph is one hop per call, not a full corpus like Connected Papers'.

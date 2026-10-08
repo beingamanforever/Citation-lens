@@ -12,7 +12,7 @@ import time
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
-from .papers import Papers, merge, s2_ref
+from .papers import Papers, arxiv_base, identifier, merge, primary_url, s2_ref
 
 RECENT_DAYS = 730
 # One slow or throttled provider must not hold a whole call.
@@ -168,15 +168,31 @@ class Graphs:
             result["edges"] = edges[:EDGES_PER_PAGE]
             if len(edges) > EDGES_PER_PAGE:
                 result["edges_omitted"] = len(edges) - EDGES_PER_PAGE
+            displayed = {tuple(edge) for edge in result["edges"]}
+            evidence = [
+                item for item in graph.get("edge_evidence", []) if tuple(item["edge"]) in displayed
+            ]
+            if evidence:
+                result["edge_evidence"] = evidence
             result["edge_note"] = (
-                "[citing, cited] from provider reference lists; to check one, open "
-                "https://api.semanticscholar.org/graph/v1/paper/<citing id>/references"
+                "[citing, cited] from reference lists; primary arXiv links include compact "
+                "edge_evidence with the inspected bibliography item"
             )
         return result
 
     def _save(self, graph: dict) -> str:
         graph_id = uuid.uuid4().hex[:12]
         graph["created_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+        for paper in graph["nodes"].values():
+            cached = paper
+            # A versioned seed navigates its bibliography, not the cached abstract metadata.
+            if paper["arxiv"] != arxiv_base(paper["arxiv"]):
+                versioned = paper["arxiv"]
+                cached = paper | {"arxiv": arxiv_base(versioned)}
+                cached["url"] = primary_url(cached)
+                if paper["pdf"] == "https://arxiv.org/pdf/" + versioned:
+                    cached["pdf"] = "https://arxiv.org/pdf/" + cached["arxiv"]
+            self.papers.remember(cached)
         graph["nodes"] = {
             pid: {k: v for k, v in paper.items() if k != "refs"}
             for pid, paper in graph["nodes"].items()
@@ -285,9 +301,43 @@ class Graphs:
         references, and recent work comes from the last two years. Query match keeps the graph
         on topic; Semantic Scholar recommendations add similar papers a citation list misses."""
         started, since = time.monotonic(), window_start()
+        requested_versions: dict[str, set[str]] = {}
+        for seed_id in seed_ids:
+            normalized = identifier(seed_id)
+            if normalized.startswith("ARXIV:"):
+                value = normalized[6:]
+                if value != arxiv_base(value):
+                    requested_versions.setdefault(arxiv_base(value), set()).add(value)
         seeds = await self.papers.resolve_many(seed_ids, BATCH_SECONDS)
         if not seeds:
             raise ValueError("None of the seed IDs could be resolved")
+        conflicting_bases = {
+            base for base, versions in requested_versions.items() if len(versions) > 1
+        }
+        version_errors = []
+        for base, versions in requested_versions.items():
+            if len(versions) > 1:
+                version_errors.append(
+                    {
+                        "seed": "ARXIV:" + base,
+                        "lookup": "seed",
+                        "error": "Conflicting requested arXiv versions: "
+                        + ", ".join(sorted(versions)),
+                    }
+                )
+                continue
+            version = next(iter(versions))
+            seeds = [
+                seed
+                | {
+                    "arxiv": version,
+                    "url": "https://arxiv.org/abs/" + version,
+                    "pdf": "https://arxiv.org/pdf/" + version,
+                }
+                if arxiv_base(seed["arxiv"]) == base
+                else seed
+                for seed in seeds
+            ]
         lookups = []
         if direction in ("both", "forward"):
             for index, seed in enumerate(seeds):
@@ -295,20 +345,39 @@ class Graphs:
                 if index < SIMILAR_SEEDS:  # Seeds come most central first; spare the API.
                     lookups.append((index, "similar", self.papers.similar(seed)))
         backward = direction in ("both", "backward")
+        reference_indices = [
+            index
+            for index, seed in enumerate(seeds)
+            if backward and arxiv_base(seed["arxiv"]) not in conflicting_bases
+        ]
         results = await asyncio.gather(
             *(asyncio.wait_for(call, LOOKUP_SECONDS) for *_, call in lookups),
-            asyncio.wait_for(self.papers.references(seeds if backward else []), LOOKUP_SECONDS),
+            asyncio.wait_for(
+                self.papers.references([seeds[index] for index in reference_indices]),
+                LOOKUP_SECONDS,
+            ),
             return_exceptions=True,
         )
         # One batch serves every seed's references; split it back into per-seed lookups.
         references = results.pop()
+        by_seed = (
+            {}
+            if isinstance(references, BaseException)
+            else dict(zip(reference_indices, references, strict=True))
+        )
         for index in range(len(seeds) if backward else 0):
             lookups.append((index, "references", None))
-            results.append(
-                references if isinstance(references, BaseException) else references[index]
-            )
+            if arxiv_base(seeds[index]["arxiv"]) in conflicting_bases:
+                results.append(
+                    RuntimeError("Backward references skipped for conflicting arXiv versions")
+                )
+            else:
+                results.append(
+                    references if isinstance(references, BaseException) else by_seed[index]
+                )
 
-        records, raw_edges, recommended, errors = list(seeds), [], [], []
+        records, raw_edges, primary_evidence, recommended = list(seeds), [], [], []
+        errors = version_errors
         for seed in seeds:
             if not s2_ref(seed):
                 errors.append(
@@ -332,6 +401,14 @@ class Graphs:
                 errors += [
                     {"seed": seeds[index]["id"], "lookup": kind, "error": e} for e in failures
                 ]
+            elif kind == "references":
+                errors += [
+                    {"seed": seeds[index]["id"], "lookup": kind, "error": error}
+                    for error in result["errors"]
+                ]
+                coverage[index]["reference_coverage"] = result["coverage"]
+                evidence = {item["cited"]: item for item in result["evidence"]}
+                result = result["papers"]
             coverage[index][kind] = len(result)
             for rank, paper in enumerate(result):
                 if kind == "similar":
@@ -339,12 +416,28 @@ class Graphs:
                 else:
                     pair = (index, len(records))
                     raw_edges.append(pair if kind == "references" else pair[::-1])
+                    if kind == "references" and paper["id"] in evidence:
+                        primary_evidence.append((pair[0], pair[1], evidence[paper["id"]]))
                 records.append(paper)
 
         papers, owners = merge(records)
         nodes = {p["id"]: p for p in papers}
         seed_set = list(dict.fromkeys(owners[: len(seeds)]))
         edges = {(owners[a], owners[b]) for a, b in raw_edges if owners[a] != owners[b]}
+        edge_evidence = []
+        evidenced = set()
+        for citing, cited, evidence in primary_evidence:
+            edge = (owners[citing], owners[cited])
+            if edge in edges and edge not in evidenced:
+                edge_evidence.append(
+                    {
+                        "edge": list(edge),
+                        "matched_id": evidence["matched_id"],
+                        "source": evidence["source"],
+                        "url": evidence["url"],
+                    }
+                )
+                evidenced.add(edge)
         pool = [p for p in papers if p["id"] not in seed_set]
         if not pool:
             raise RuntimeError("No citation neighbors found: " + json.dumps(errors))
@@ -471,6 +564,7 @@ class Graphs:
             "notes": notes,
             "nodes": nodes,
             "edges": sorted(edges),
+            "edge_evidence": edge_evidence,
             "coverage": seed_coverage,
             "errors": errors,
         }

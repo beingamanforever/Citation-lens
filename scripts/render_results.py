@@ -103,8 +103,11 @@ def model_family(model: str) -> str:
 
 def build_report(host_id: str, label: str, path: Path, results: dict, task_set: dict) -> dict:
     grading = results["grading"]
-    if grading.get("grading_revision") not in (2, 3) or grading.get("pairwise_rerun") is not True:
-        raise ValueError(f"{path} requires revision-2/3 grading with pairwise_rerun=true")
+    if (
+        grading.get("grading_revision") not in (2, 3, 4)
+        or grading.get("pairwise_rerun") is not True
+    ):
+        raise ValueError(f"{path} requires revision-2/3/4 grading with pairwise_rerun=true")
     if not isinstance(grading.get("offline"), bool):
         raise ValueError(f"{path} must record whether grading was offline")
 

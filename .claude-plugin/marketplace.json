@@ -1,14 +1,14 @@
 {
   "name": "citation-lens",
-  "description": "Find papers, walk their citation graph like Connected Papers, and read the evidence.",
+  "description": "Search papers, follow citations and read the evidence.",
   "owner": {
     "name": "Aman Behera"
   },
   "plugins": [
     {
       "name": "citation-lens",
-      "version": "0.2.0",
-      "description": "Find papers, walk their citation graph like Connected Papers, and read the evidence.",
+      "version": "0.2.1",
+      "description": "Search papers, follow citations and read the evidence.",
       "author": {
         "name": "Aman Behera"
       },

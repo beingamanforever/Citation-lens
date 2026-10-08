@@ -227,6 +227,37 @@ The renderer creates `../output/citation-lens-results.html` from the exported re
 It calculates every metric from the saved data and labels regressions explicitly.
 Until a host's graded export exists, its tab shows a pending message without estimated metrics.
 
+## Later development and fresh confirmation
+
+Three later development candidates were rejected by the rule saved before grading.
+All four versions ran the original four development tasks twice in both arms using the same frozen inference runner, common revision-4 grader, 420-second deadline, eight-call budget, 25-paper ceiling, cold caches and two concurrent attempts.
+All 64 attempts remain preserved, including six exceeded-budget failures across the candidate versions.
+The final candidate completed seven of eight Lens attempts, used 235,463 versus 100,729 mean processed input tokens for the baseline, and tied its native control four to four.
+It also returned fewer verified useful citation links than native research.
+[Development results](DEVELOPMENT.md) include all candidates, failures, selection rules, source packages and public answer-level evidence.
+
+Version 0.2.1 retains independently verified correctness repairs and returns to the earlier few-call plan with general wording.
+Its final guidance differs from the measured candidates and has not had a paired end-to-end evaluation.
+Historical Codex and Claude scores remain attached to their original packages.
+Smaller cached reads or recovered bibliography links do not establish an overall quality, latency or token advantage.
+
+The audited ten topics are now regression cases.
+A separate private version-4 draft contains ten new topics and 42 reference anchors selected before candidate answers, including surveys, lineages, frontier work and cross-domain tasks.
+Separate model-based agents proposed and reviewed it against primary sources, with knowledge of the earlier failure analysis.
+It is not an externally sampled benchmark or a guarantee across research domains.
+Anchors measure reference-anchor recall, not an exhaustive reading list.
+The draft has not been exposed to inference or published, and no fresh confirmation is run on a rejected performance candidate.
+A future selected candidate must be frozen before confirmation, with no topic replacement, grader tuning or paper-specific changes based on held-out outcomes.
+
+Grading revision 4 applies equally to all four development versions.
+It recognizes versioned bioRxiv and medRxiv URLs as their canonical DOIs while retaining independent destination verification, and bounds recency by the run date as well as its lower cutoff.
+Title checks recognize Unicode and simple unsigned math-subscript renderings; unrelated title suffixes and verbatim quotes retain their identity requirements.
+A year-only date earns recent credit only when the entire year lies inside the window; overlapping boundary years are flagged as unverified and receive no recent credit.
+Dates are resolved index metadata, not proof of the earliest appearance across every preprint and journal version.
+The historical revision-3 exports remain unchanged; the two boundary-year entries found there already lack valid URL credit and do not affect scored recent-paper counts.
+The judge criteria, blinding and quality rule are unchanged.
+The later runner validation rejects unsafe or colliding task names before writing output and does not change inference prompts.
+
 ## Limits
 
 - **Model-based judgment.** The Codex comparison uses a GPT judge from the agents' own model family.

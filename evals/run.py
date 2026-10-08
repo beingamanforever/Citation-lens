@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -131,6 +132,22 @@ def provider_health():
 
 def load_tasks(split, names, path=None):
     tasks = json.loads((path or ROOT / "evals/tasks.json").read_text())["tasks"]
+    seen = set()
+    for index, task in enumerate(tasks):
+        name = task.get("name") if isinstance(task, dict) else None
+        if (
+            not isinstance(name, str)
+            or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name)
+            or re.fullmatch(r"con|prn|aux|nul|com[1-9]|lpt[1-9]", name)
+        ):
+            raise SystemExit(
+                f"Invalid task name at index {index}; use lowercase ASCII letters, digits, "
+                "underscores or hyphens, starting with a letter or digit, and avoid "
+                "reserved device names"
+            )
+        if name in seen:
+            raise SystemExit(f"Duplicate task name {name!r}; task names must be unique")
+        seen.add(name)
     chosen = [t for t in tasks if (t["name"] in names if names else t["split"] == split)]
     if not chosen:
         raise SystemExit("No tasks selected")
@@ -156,9 +173,11 @@ def file_digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def source_hashes(root):
+def source_hashes(root, tasks_path=None):
+    tasks_path = Path(tasks_path) if tasks_path is not None else root / "evals/tasks.json"
     return {"package": package_digest(root)} | {
-        name: file_digest(root / source) for name, (source, _) in SNAPSHOT_FILES.items()
+        name: file_digest(tasks_path if name == "tasks" else root / source)
+        for name, (source, _) in SNAPSHOT_FILES.items()
     }
 
 
@@ -168,7 +187,8 @@ def frozen_hashes(out):
     }
 
 
-def freeze_sources(root, out):
+def freeze_sources(root, out, tasks_path=None):
+    tasks_path = Path(tasks_path) if tasks_path is not None else root / "evals/tasks.json"
     package = out / "package"
     for item in PACKAGE_ITEMS:
         source, target = root / item, package / item
@@ -177,8 +197,8 @@ def freeze_sources(root, out):
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
-    for source, target in SNAPSHOT_FILES.values():
-        shutil.copy2(root / source, out / target)
+    for name, (source, target) in SNAPSHOT_FILES.items():
+        shutil.copy2(tasks_path if name == "tasks" else root / source, out / target)
 
 
 def build_prompt(task, mode, today, package=ROOT):
@@ -539,6 +559,7 @@ def run_attempt(task, mode, rep, args, today):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--tasks", type=Path, default=ROOT / "evals/tasks.json")
     parser.add_argument("--split", choices=["development", "held_out"], default="development")
     parser.add_argument("--task", nargs="*", default=[], help="task names (overrides --split)")
     parser.add_argument("--modes", nargs="+", choices=["web", "lens"], default=["web", "lens"])
@@ -562,8 +583,9 @@ def main():
     args.modes = list(dict.fromkeys(args.modes))
     args.model = args.model or DEFAULT_MODELS[args.agent]
     args.out = args.out.resolve()
+    args.tasks = args.tasks.resolve()
     try:
-        selected = load_tasks(args.split, args.task)
+        selected = load_tasks(args.split, args.task, args.tasks)
     except (OSError, KeyError, json.JSONDecodeError) as error:
         raise SystemExit(
             f"Current task definitions cannot be validated ({error}); use a new --out directory."
@@ -588,7 +610,7 @@ def main():
         "provider_keys": provider_keys,
     }
     manifest_path = args.out / "manifest.json"
-    current_hashes = source_hashes(ROOT)
+    current_hashes = source_hashes(ROOT, args.tasks)
     if manifest_path.exists():
         try:
             manifest = json.loads(manifest_path.read_text())
@@ -644,7 +666,7 @@ def main():
                 "directory. Existing files were preserved."
             )
         args.out.mkdir(parents=True, exist_ok=True)
-        freeze_sources(ROOT, args.out)
+        freeze_sources(ROOT, args.out, args.tasks)
         frozen = frozen_hashes(args.out)
         if frozen != current_hashes:
             raise SystemExit("Failed to create an exact run snapshot; use a new --out directory")

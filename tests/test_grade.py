@@ -71,6 +71,20 @@ def test_tool_masking_covers_contract_names_without_masking_scientific_lenses():
         ("https://aclanthology.org/2022.naacl-main.272/", "DOI:10.18653/v1/2022.naacl-main.272"),
         ("https://dl.acm.org/doi/10.1145/3600006.3613165", "DOI:10.1145/3600006.3613165"),
         ("https://www.science.org/doi/10.1126/science.adi2336", "DOI:10.1126/science.adi2336"),
+        (
+            "https://www.biorxiv.org/content/10.1101/2025.06.14.659707v1",
+            "DOI:10.1101/2025.06.14.659707",
+        ),
+        (
+            "https://www.biorxiv.org/content/10.1101/2021.10.04.463034v2.full.pdf",
+            "DOI:10.1101/2021.10.04.463034",
+        ),
+        (
+            "https://www.medrxiv.org/content/10.1101/2024.01.01.123456v3.full",
+            "DOI:10.1101/2024.01.01.123456",
+        ),
+        ("https://doi.org/10.1234/paperv1", "DOI:10.1234/paperv1"),
+        ("https://[invalid/paper", None),
         ("https://openreview.net/forum?id=abc", None),
     ],
 )
@@ -87,6 +101,75 @@ def test_same_title_tolerates_case_and_punctuation_but_not_other_papers():
     )
     assert not same_title("FlashAttention", "FlashAttention-2: Faster Attention")
     assert not same_title("", "Anything")
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "matches"),
+    [
+        ("$π_0$: A research model", "π0: A research model", True),
+        ("$α_{12}$: A research model", "α₁₂: A research model", True),
+        ("$π_0$: A research model", "π₁: A research model", False),
+        ("$α_0$: A research model", "β0: A research model", False),
+        ("$x_{-1}$: A research model", "x1: A research model", False),
+        ("A research_model", "A researchmodel", False),
+    ],
+)
+def test_title_rendering_equivalence_preserves_identity(first, second, matches):
+    assert same_title(first, second) is matches
+
+
+@pytest.mark.parametrize("rendered", ["α0: A research model", "α₀: A research model"])
+def test_rendered_title_resolves_by_id_and_matches_one_bibliography_item(rendered):
+    from conftest import s2
+
+    paper = s2("1", "$α_0$: A research model", 2025, arxiv="2501.00001")
+    paper["authors"] = ["Alice Researcher"]
+
+    class FakeResolver(Resolver):
+        def __init__(self):
+            pass
+
+        async def lookup(self, pid):
+            assert pid == "ARXIV:2501.00001"
+            return paper
+
+    assert asyncio.run(FakeResolver().resolve(rendered, paper["url"])) == (paper, "ok")
+    item = {"ids": [], "title": rendered, "text": "Alice Researcher. 2025."}
+    assert bibliography_match([item], paper)["source"] == "primary_title_authors_year"
+    assert bibliography_match([item | {"title": "α₁: A research model"}], paper) is None
+    assert quote_text(rendered) != quote_text(paper["title"])
+
+
+@pytest.mark.parametrize("kind", ["html", "pdf"])
+@pytest.mark.parametrize(("index", "matches"), [("₀", True), ("₁", False)])
+def test_destination_metadata_checks_rendering_without_accepting_different_indexes(
+    kind, index, matches
+):
+    import io
+
+    from conftest import s2
+    from pypdf import PdfWriter
+
+    title = f"α{index}: A research model"
+    if kind == "pdf":
+        writer = PdfWriter()
+        writer.add_blank_page(width=200, height=200)
+        writer.add_metadata({"/Title": title, "/Author": "Alice Researcher"})
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        data = buffer.getvalue()
+    else:
+        data = f'<meta name="citation_title" content="{title}">'.encode()
+
+    class FakeWeb:
+        async def fetch(self, url, **kwargs):
+            return data
+
+    resolver = object.__new__(Resolver)
+    resolver.web = FakeWeb()
+    paper = s2("1", "$α_0$: A research model", 2025)
+    paper["authors"] = ["Alice Researcher"]
+    assert asyncio.run(resolver.page_matches(paper, "https://example.org/paper")) is matches
 
 
 def test_score_counts_only_found_relevant_papers_and_verified_links():
@@ -160,6 +243,116 @@ def test_unknown_url_needs_destination_evidence():
     assert paper and status == "url_unverified"
 
 
+@pytest.mark.parametrize("destination_matches", [True, False])
+def test_versioned_preprint_url_still_requires_independent_destination_proof(destination_matches):
+    from conftest import s2
+
+    paper = s2("1", "A biomolecular research paper", 2025)
+    paper["doi"] = "10.1101/2025.06.14.659707"
+    url = "https://www.biorxiv.org/content/10.1101/2025.06.14.659707v2"
+
+    class FakeResolver(Resolver):
+        def __init__(self):
+            pass
+
+        async def lookup(self, pid):
+            assert pid == "DOI:" + paper["doi"]
+            return paper
+
+        async def page_matches(self, resolved, destination):
+            assert resolved is paper and destination == url
+            return destination_matches
+
+    resolved, status = asyncio.run(FakeResolver().resolve(paper["title"], url))
+    assert resolved is paper
+    assert status == ("ok" if destination_matches else "url_unverified")
+
+
+@pytest.mark.parametrize(
+    ("citation_url", "verified"),
+    [
+        ("https://www.biorxiv.org/content/10.1101/2024.01.01.123456v2.full", True),
+        ("https://unrelated.example/content/10.1101/2024.01.01.123456", False),
+        ("https://www.biorxiv.org.evil.example/content/10.1101/2024.01.01.123456v2", False),
+        ("ftp://www.biorxiv.org/content/10.1101/2024.01.01.123456v2", False),
+    ],
+)
+def test_fact_checker_enforces_both_publication_cutoffs_and_canonical_citation_urls(
+    citation_url, verified
+):
+    from conftest import s2
+
+    dates = ["2024-10-07", "2024-10-08", "2026-10-08", "2026-10-09"]
+    papers = [
+        s2(str(index + 1), f"Research paper {index}", int(posted[:4]))
+        for index, posted in enumerate(dates)
+    ]
+    for paper, posted in zip(papers, dates, strict=True):
+        paper["date"] = posted
+    papers[0]["doi"] = "10.1101/2024.01.01.123456"
+
+    class FakeResolver:
+        async def prefetch(self, ids):
+            pass
+
+        async def resolve(self, title, url):
+            return next(p for p in papers if p["title"] == title), "ok"
+
+        async def bibliography(self, paper):
+            return [{"ids": ["DOI:" + papers[0]["doi"]], "title": "", "text": "Verified reference"}]
+
+    record = {
+        "task": "t",
+        "status": "ok",
+        "answer": {
+            "papers": [{"title": p["title"], "url": p["url"]} for p in papers],
+            "citations": [
+                {
+                    "citing_url": papers[1]["url"],
+                    "cited_url": citation_url,
+                }
+            ],
+        },
+    }
+    asyncio.run(
+        check_facts([record], {"t": {"anchors": []}}, FakeResolver(), "2024-10-08", "2026-10-08")
+    )
+    assert [entry["recent"] for entry in record["entries"]] == [False, True, True, False]
+    assert record["edges"][0]["verified"] is verified
+
+
+def test_year_only_dates_cannot_prove_recency_at_either_boundary():
+    from conftest import s2
+
+    papers = [s2(str(year), f"Research paper {year}", year) for year in range(2023, 2028)]
+    for paper in papers:
+        paper["date"] = None
+
+    class FakeResolver:
+        async def prefetch(self, ids):
+            pass
+
+        async def resolve(self, title, url):
+            return next(p for p in papers if p["title"] == title), "ok"
+
+    record = {
+        "task": "t",
+        "status": "ok",
+        "answer": {"papers": [{"title": p["title"], "url": p["url"]} for p in papers]},
+    }
+    asyncio.run(
+        check_facts([record], {"t": {"anchors": []}}, FakeResolver(), "2024-10-08", "2026-10-08")
+    )
+    assert [e["recent"] for e in record["entries"]] == [False, False, True, False, False]
+    assert [e["recent_date_unverified"] for e in record["entries"]] == [
+        False,
+        True,
+        False,
+        True,
+        False,
+    ]
+
+
 def test_bibliography_requires_full_identity_in_one_item():
     from conftest import s2
 
@@ -215,7 +408,9 @@ def test_fact_checker_rejects_altered_quote_and_different_cited_paper():
             "citations": [{"citing_url": citing["url"], "cited_url": cited["url"]}],
         },
     }
-    asyncio.run(check_facts([record], {"t": {"anchors": []}}, FakeResolver(), "2024-01-01"))
+    asyncio.run(
+        check_facts([record], {"t": {"anchors": []}}, FakeResolver(), "2024-01-01", "2026-10-08")
+    )
     assert record["entries"][0]["quote_found"] is False
     assert record["edges"][0]["verified"] is False
 
@@ -262,7 +457,9 @@ def test_malformed_failed_answers_stay_in_the_denominator():
             assert ids == []
 
     record = {"task": "t", "status": "invalid_answer", "answer": {"papers": [{}]}}
-    asyncio.run(check_facts([record], {"t": {"anchors": []}}, FakeResolver(), "2024-01-01"))
+    asyncio.run(
+        check_facts([record], {"t": {"anchors": []}}, FakeResolver(), "2024-01-01", "2026-10-08")
+    )
     assert record["entries"] == record["edges"] == record["anchors_found"] == []
 
 

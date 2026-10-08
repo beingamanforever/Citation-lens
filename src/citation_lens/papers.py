@@ -8,7 +8,9 @@ merge on shared arXiv, DOI, provider or exact-title keys.
 import asyncio
 import re
 import xml.etree.ElementTree as ET
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urljoin
+
+from bs4 import BeautifulSoup
 
 from .network import Web
 
@@ -24,10 +26,18 @@ OA_FIELDS = (
     "authorships,primary_location,best_oa_location,referenced_works"
 )
 ARXIV_ID = r"(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?/\d{7})"
-ATOM = {"a": "http://www.w3.org/2005/Atom", "o": "http://a9.com/-/spec/opensearch/1.1/"}
+ATOM = {
+    "a": "http://www.w3.org/2005/Atom",
+    "o": "http://a9.com/-/spec/opensearch/1.1/",
+    "arxiv": "http://arxiv.org/schemas/atom",
+}
 PREFIXES = {"ARXIV": "arxiv", "DOI": "doi", "S2": "s2", "OA": "oa"}
 STOPWORDS = set("a an and are as at by for from in of on or the to via with without".split())
 CITATION_PROVIDER_SECONDS = 20
+REFERENCE_PROVIDER_SECONDS = 8
+PRIMARY_REFERENCE_SECONDS = 12
+PRIMARY_REFERENCE_LIMIT = 100
+PRIMARY_HYDRATION_LIMIT = 100
 
 
 def _provider_error(provider: str, error: BaseException) -> str:
@@ -109,12 +119,13 @@ def _record(**fields) -> dict:
         "refs": [],
         "sources": [],
     } | fields
-    doi = (paper["doi"] or "").lower().removeprefix("https://doi.org/")
+    doi = (paper["doi"] or "").strip().lower().removeprefix("https://doi.org/")
     if match := re.fullmatch(rf"10\.48550/arxiv\.({ARXIV_ID})", doi):
         paper["arxiv"], doi = paper["arxiv"] or match.group(1), ""
     paper["doi"] = doi
     paper["title"] = " ".join(paper["title"].split())
-    if not paper["abstract"]:
+    if not paper["abstract"].strip():
+        paper["abstract"] = ""
         paper["abstract_source"] = None
     paper["year"] = paper["year"] or (int(paper["date"][:4]) if paper["date"] else None)
     paper["id"] = canonical_id(paper)
@@ -186,6 +197,7 @@ def from_arxiv(data: bytes) -> tuple[list[dict], int]:
                 abstract=" ".join(entry.findtext("a:summary", "", ATOM).split()),
                 abstract_source="arxiv",
                 arxiv=match.group(1),
+                doi=entry.findtext("arxiv:doi", "", ATOM),
                 pdf="https://arxiv.org/pdf/" + match.group(1),
                 sources=["arxiv"],
             )
@@ -198,9 +210,10 @@ def _combine(first: dict, second: dict) -> dict:
     rank = {"arxiv": 0, "semantic_scholar": 1, "openalex": 2}
     a, b = sorted((first, second), key=lambda p: min(rank[s] for s in p["sources"]))
     merged = dict(a)
-    for field in ("title", "venue", "arxiv", "doi", "s2", "oa", "pdf"):
+    merged["title"] = a["title"] if a["title"].strip() else b["title"]
+    for field in ("venue", "arxiv", "doi", "s2", "oa", "pdf"):
         merged[field] = a[field] or b[field]
-    abstract = a if a["abstract"] else b
+    abstract = a if a["abstract"].strip() else b
     merged["abstract"] = abstract["abstract"]
     merged["abstract_source"] = abstract.get("abstract_source")
     merged["authors"] = max(a["authors"], b["authors"], key=len)
@@ -290,12 +303,10 @@ def merge(records: list[dict]) -> tuple[list[dict], list[str]]:
     return merged, [groups[root(index)]["id"] for index in members]
 
 
-def strict_terms(query: str, count: int = 4) -> list[str]:
-    """The first content words of a query. OpenAlex and arXiv match every term, so a long
-    query returns nothing; Semantic Scholar ranks partial matches and gets the full text."""
+def strict_terms(query: str) -> list[str]:
+    """Content words and quoted phrases used by strict-match providers."""
     words = re.findall(r'"[^"]+"|[^\s"]+', query)
-    content = [w for w in words if w.strip('"').casefold() not in STOPWORDS]
-    return content[:count]
+    return [word for word in words if word.strip('"').casefold() not in STOPWORDS]
 
 
 def _arxiv_expression(query: str) -> str:
@@ -334,36 +345,43 @@ class Papers:
         """Batch-resolve IDs; unresolved IDs are omitted. One S2 request covers up to 500."""
         wanted = [identifier(value) for value in paper_ids]
         cached = {value: self.cached(value) for value in wanted}
-        # Records cached from OpenAlex or arXiv lack Semantic Scholar's citation graph.
-        missing = [value for value in wanted if not (cached[value] or {}).get("s2")]
+        missing = [
+            value
+            for value in wanted
+            if not ((cached[value] or {}).get("title") or "").strip()
+            or not ((cached[value] or {}).get("abstract") or "").strip()
+        ]
         found: dict[str, dict] = {}
         if missing:
-            s2_ids = [
-                ("arXiv:" + arxiv_base(v[6:]))
-                if v.startswith("ARXIV:")
-                else ("DOI:" + v[4:])
-                if v.startswith("DOI:")
-                else v[3:]
-                for v in missing
-                if not v.startswith("OA:")
-            ]
-            if s2_ids:
+            s2_targets = []
+            for value in missing:
+                ref = s2_ref(cached[value]) if cached[value] else ""
+                if not ref and value.startswith("ARXIV:"):
+                    ref = "arXiv:" + arxiv_base(value[6:])
+                elif not ref and value.startswith("DOI:"):
+                    ref = value
+                elif not ref and value.startswith("S2:"):
+                    ref = value[3:]
+                if ref:
+                    s2_targets.append((value, ref))
+            if s2_targets:
+                batch = s2_targets[:500]
                 try:
                     rows = await asyncio.wait_for(
                         self.web.json(
-                            f"{S2}/paper/batch?fields={S2_FIELDS}", body={"ids": s2_ids[:500]}
+                            f"{S2}/paper/batch?fields={S2_FIELDS}",
+                            body={"ids": [ref for _, ref in batch]},
                         ),
                         s2_seconds,
                     )
-                    for row in rows:
+                    for (value, ref), row in zip(batch, rows, strict=False):
                         if row:
                             paper = from_s2(row)
-                            for value in missing:
-                                if _matches(paper, value):
-                                    found[value] = paper
+                            if _matches(paper, identifier(ref)):
+                                found[value] = paper
                 except (RuntimeError, ValueError, TimeoutError):
                     pass  # OpenAlex and arXiv below are independent fallbacks.
-            rest = [v for v in missing if v not in found and not cached[v]]
+            rest = [value for value in missing if value not in found]
             for paper in await self._fallback(rest):
                 for value in rest:
                     if _matches(paper, value):
@@ -390,18 +408,21 @@ class Papers:
         ]
         calls = [self.web.json(f"{OA}/{quote(t, safe=':/')}?select={OA_FIELDS}") for t in tails]
         if arxiv_ids := [arxiv_base(v[6:]) for v in values if v.startswith("ARXIV:")]:
-            params = {"id_list": ",".join(arxiv_ids), "max_results": len(arxiv_ids)}
-            calls.append(self.web.fetch(f"{ARXIV}?{urlencode(params)}"))
+            calls.append(self._arxiv_batch(arxiv_ids))
         papers = []
         for result in await asyncio.gather(*calls, return_exceptions=True):
             if isinstance(result, dict):
                 papers.append(from_openalex(result))
-            elif isinstance(result, bytes):
-                try:
-                    papers += from_arxiv(result)[0]
-                except ET.ParseError:
-                    pass
+            elif isinstance(result, list):
+                papers += result
         return papers
+
+    async def _arxiv_batch(self, arxiv_ids: list[str]) -> list[dict]:
+        ids = list(dict.fromkeys(map(arxiv_base, arxiv_ids)))
+        if not ids:
+            return []
+        params = {"id_list": ",".join(ids), "max_results": len(ids)}
+        return from_arxiv(await self.web.fetch(f"{ARXIV}?{urlencode(params)}"))[0]
 
     async def search(
         self, query: str, provider: str, limit: int, since: str | None = None, newest: bool = False
@@ -443,40 +464,342 @@ class Papers:
             raise ValueError("provider must be semantic_scholar, openalex or arxiv")
         return [self.remember(paper) for paper in papers], total
 
-    async def references(self, papers: list[dict]) -> list[list[dict] | Exception]:
-        """Every indexed reference of each paper: one Semantic Scholar batch for all of them,
-        then OpenAlex reference lists for papers it misses. A failure is returned, not raised."""
+    async def references(self, papers: list[dict]) -> list[dict]:
+        """References and per-provider coverage for every seed.
+
+        Semantic Scholar and OpenAlex remain authoritative when they return a reference list,
+        including an empty one. An unavailable indexed list for an arXiv seed falls back to
+        explicit identifiers in that seed's primary HTML bibliography.
+        """
         ids = [s2_ref(p) for p in papers]
         wanted = [i for i, ref in enumerate(ids) if ref]
-        results: list = [None] * len(papers)
-        s2_failure = None
+        results = [
+            {
+                "papers": [],
+                "errors": [],
+                "coverage": {"source": "unavailable", "returned": 0},
+                "evidence": [],
+            }
+            for _ in papers
+        ]
+        available = [False] * len(papers)
         if wanted:
             nested = ",".join("references." + field for field in S2_FIELDS.split(","))
             try:
-                rows = await self.web.json(
-                    f"{S2}/paper/batch?fields={nested}", body={"ids": [ids[i] for i in wanted]}
+                rows = await asyncio.wait_for(
+                    self.web.json(
+                        f"{S2}/paper/batch?fields={nested}",
+                        body={"ids": [ids[index] for index in wanted]},
+                    ),
+                    REFERENCE_PROVIDER_SECONDS,
                 )
-                for index, row in zip(wanted, rows, strict=False):  # rows follow the ID order
-                    if row:
-                        results[index] = [
-                            from_s2(r) for r in row.get("references") or [] if r.get("paperId")
-                        ]
             except (RuntimeError, ValueError, TimeoutError) as error:
-                s2_failure = error  # OpenAlex below tries every paper the batch missed.
-        missing = [i for i, refs in enumerate(results) if refs is None]
-        fallback = await asyncio.gather(
-            *(self._openalex_references(papers[i]) for i in missing), return_exceptions=True
-        )
-        for index, refs in zip(missing, fallback, strict=True):
-            if s2_failure and isinstance(refs, Exception):
-                results[index] = RuntimeError(
-                    _provider_error("Semantic Scholar", s2_failure)
-                    + "; "
-                    + _provider_error("OpenAlex", refs)
-                )
+                for index in wanted:
+                    results[index]["errors"].append(_provider_error("Semantic Scholar", error))
             else:
-                results[index] = refs
+                for position, index in enumerate(wanted):  # rows follow the ID order
+                    row = (
+                        rows[position] if isinstance(rows, list) and position < len(rows) else None
+                    )
+                    refs = row.get("references") if isinstance(row, dict) else None
+                    if not isinstance(refs, list):
+                        results[index]["errors"].append(
+                            "Semantic Scholar: reference list unavailable"
+                        )
+                        continue
+                    try:
+                        found = [
+                            from_s2(raw)
+                            for raw in refs
+                            if isinstance(raw, dict) and raw.get("paperId")
+                        ]
+                    except ValueError as error:
+                        results[index]["errors"].append(
+                            _provider_error("Semantic Scholar reference metadata", error)
+                        )
+                        continue
+                    results[index]["papers"] = found
+                    results[index]["coverage"] = {
+                        "source": "semantic_scholar",
+                        "returned": len(found),
+                    }
+                    available[index] = True
+
+        missing = [index for index, known in enumerate(available) if not known]
+        tasks = {
+            asyncio.create_task(self._openalex_references(papers[index])): index
+            for index in missing
+        }
+        if tasks:
+            try:
+                done, pending = await asyncio.wait(
+                    tasks,
+                    timeout=REFERENCE_PROVIDER_SECONDS,
+                    return_when=asyncio.ALL_COMPLETED,
+                )
+            except BaseException:
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            for task in done:
+                index = tasks[task]
+                try:
+                    found = task.result()
+                except (RuntimeError, ValueError, TimeoutError) as error:
+                    results[index]["errors"].append(_provider_error("OpenAlex", error))
+                else:
+                    results[index]["papers"] = found
+                    results[index]["coverage"] = {
+                        "source": "openalex",
+                        "returned": len(found),
+                    }
+                    available[index] = True
+            for task in pending:
+                results[tasks[task]]["errors"].append("OpenAlex: reference lookup timed out")
+
+        primary = await self._primary_references(
+            [
+                (index, paper)
+                for index, paper in enumerate(papers)
+                if not available[index] and paper["arxiv"]
+            ]
+        )
+        for index, recovered in primary.items():
+            results[index]["papers"] = recovered["papers"]
+            results[index]["errors"] += recovered["errors"]
+            results[index]["coverage"] = recovered["coverage"]
+            results[index]["evidence"] = recovered["evidence"]
+        for result in results:
+            result["errors"] = list(dict.fromkeys(result["errors"]))
         return results
+
+    async def _primary_references(self, seeds: list[tuple[int, dict]]) -> dict[int, dict]:
+        """Recover explicit arXiv and DOI bibliography links without title matching."""
+        if not seeds:
+            return {}
+        deadline = asyncio.get_running_loop().time() + PRIMARY_REFERENCE_SECONDS
+        recovered = {
+            index: {
+                "papers": [],
+                "errors": [],
+                "coverage": {
+                    "source": "primary_arxiv",
+                    "returned": 0,
+                    "total": 0,
+                    "inspected": 0,
+                    "identified": 0,
+                    "unidentified": 0,
+                    "ambiguous": 0,
+                    "unresolved": 0,
+                    "truncated": 0,
+                    "metadata_truncated": 0,
+                },
+                "evidence": [],
+            }
+            for index, _ in seeds
+        }
+        issues = {index: {"ambiguous": [], "unresolved": []} for index, _ in seeds}
+
+        def compact(message: str) -> str:
+            return message if len(message) <= 160 else message[:140].rstrip() + "... [truncated]"
+
+        def report(index: int, category: str, detail: str, count: int = 1):
+            recovered[index]["coverage"][category] += count
+            examples = issues[index][category]
+            example = compact(detail)
+            if example not in examples and len(examples) < 3:
+                examples.append(example)
+
+        urls = {index: "https://arxiv.org/html/" + paper["arxiv"] for index, paper in seeds}
+        tasks = {
+            asyncio.create_task(self.web.fetch(url, ttl=86400 * 30, max_bytes=5_000_000)): index
+            for index, url in urls.items()
+        }
+        try:
+            done, pending = await asyncio.wait(
+                tasks,
+                timeout=max(0, deadline - asyncio.get_running_loop().time()),
+                return_when=asyncio.ALL_COMPLETED,
+            )
+        except BaseException:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+        items_by_seed: dict[int, list[dict]] = {index: [] for index, _ in seeds}
+        for task in done:
+            index = tasks[task]
+            try:
+                html = task.result()
+            except (RuntimeError, ValueError, TimeoutError) as error:
+                recovered[index]["errors"].append(_provider_error("arXiv primary", error))
+                continue
+            items = BeautifulSoup(html, "html.parser").select("li.ltx_bibitem")
+            if not items:
+                recovered[index]["errors"].append(
+                    f"arXiv primary: no bibliography items at {urls[index]}"
+                )
+                continue
+            inspected = items[:PRIMARY_REFERENCE_LIMIT]
+            coverage = recovered[index]["coverage"]
+            coverage["total"] = len(items)
+            coverage["inspected"] = len(inspected)
+            coverage["truncated"] = len(items) - len(inspected)
+            if len(items) > PRIMARY_REFERENCE_LIMIT:
+                inspected_count = f"{PRIMARY_REFERENCE_LIMIT}/{len(items)}"
+                recovered[index]["errors"].append(
+                    f"arXiv primary: inspected {inspected_count} bibliography items"
+                )
+            for item in inspected:
+                found = []
+                for link in item.select("a[href]"):
+                    try:
+                        paper_id = identifier(urljoin(urls[index], link["href"]).split("#", 1)[0])
+                    except ValueError:
+                        continue
+                    if paper_id.startswith("ARXIV:"):
+                        paper_id = "ARXIV:" + arxiv_base(paper_id[6:])
+                    if paper_id.startswith(("ARXIV:", "DOI:")):
+                        found.append(paper_id)
+                found = list(dict.fromkeys(found))
+                if not found:
+                    coverage["unidentified"] += 1
+                    continue
+                coverage["identified"] += 1
+                fragment = item.get("id")
+                if not fragment:
+                    report(
+                        index,
+                        "ambiguous",
+                        "identified bibliography item without a source fragment",
+                    )
+                    continue
+                arxiv_ids = [paper_id for paper_id in found if paper_id.startswith("ARXIV:")]
+                doi_ids = [paper_id for paper_id in found if paper_id.startswith("DOI:")]
+                if len(arxiv_ids) > 1 or len(doi_ids) > 1:
+                    report(index, "ambiguous", f"{urls[index]}#{fragment}")
+                    continue
+                items_by_seed[index].append(
+                    {
+                        "ids": found,
+                        "url": urls[index] + "#" + quote(str(fragment), safe="._-:"),
+                    }
+                )
+        for task in pending:
+            index = tasks[task]
+            recovered[index]["errors"].append("arXiv primary: bibliography lookup timed out")
+
+        unresolved_by_seed: dict[int, list[str]] = {}
+        for index, items in items_by_seed.items():
+            unresolved_by_seed[index] = list(
+                dict.fromkeys(
+                    paper_id[6:]
+                    for item in items
+                    for paper_id in item["ids"]
+                    if paper_id.startswith("ARXIV:") and not self.cached(paper_id)
+                )
+            )
+        selected, selected_set, position = [], set(), 0
+        while len(selected) < PRIMARY_HYDRATION_LIMIT:
+            had_candidate = False
+            for index, _ in seeds:
+                queue = unresolved_by_seed.get(index, [])
+                if position >= len(queue):
+                    continue
+                had_candidate = True
+                arxiv_id = queue[position]
+                if arxiv_id not in selected_set:
+                    selected.append(arxiv_id)
+                    selected_set.add(arxiv_id)
+                    if len(selected) == PRIMARY_HYDRATION_LIMIT:
+                        break
+            if not had_candidate:
+                break
+            position += 1
+        for index, queue in unresolved_by_seed.items():
+            omitted = len({paper_id for paper_id in queue if paper_id not in selected_set})
+            if omitted:
+                recovered[index]["coverage"]["metadata_truncated"] = omitted
+                recovered[index]["errors"].append(
+                    f"arXiv primary: {omitted} uncached arXiv reference(s) exceed metadata cap"
+                )
+
+        if selected:
+            try:
+                hydrated = await asyncio.wait_for(
+                    self._arxiv_batch(selected),
+                    max(0, deadline - asyncio.get_running_loop().time()),
+                )
+            except (RuntimeError, ValueError, TimeoutError, ET.ParseError) as error:
+                message = _provider_error("arXiv metadata", error)
+                for index, queue in unresolved_by_seed.items():
+                    if any(paper_id in selected_set for paper_id in queue):
+                        recovered[index]["errors"].append(message)
+            else:
+                for paper in hydrated:
+                    self.remember(paper)
+
+        for index, items in items_by_seed.items():
+            seen = set()
+            for item in items:
+                known = {
+                    paper["id"]: paper
+                    for paper_id in item["ids"]
+                    if (paper := self.cached(paper_id))
+                }
+                if len(known) > 1:
+                    report(index, "ambiguous", item["url"])
+                    continue
+                if not known:
+                    if dois := [value for value in item["ids"] if value.startswith("DOI:")]:
+                        report(index, "unresolved", ", ".join(dois))
+                    else:
+                        report(index, "unresolved", item["url"])
+                    continue
+                paper = next(iter(known.values()))
+                dois = [value for value in item["ids"] if value.startswith("DOI:")]
+                if paper["doi"] and dois and "DOI:" + paper["doi"] not in dois:
+                    report(index, "ambiguous", item["url"])
+                    continue
+                unresolved_dois = [value for value in dois if not self.cached(value)]
+                if unresolved_dois:
+                    report(index, "unresolved", ", ".join(unresolved_dois))
+                if paper["id"] in seen:
+                    continue
+                seen.add(paper["id"])
+                matched_id = next(
+                    paper_id
+                    for paper_id in item["ids"]
+                    if (matched := self.cached(paper_id)) and matched["id"] == paper["id"]
+                )
+                recovered[index]["papers"].append(paper)
+                recovered[index]["evidence"].append(
+                    {
+                        "cited": paper["id"],
+                        "matched_id": matched_id,
+                        "source": "primary_arxiv",
+                        "url": item["url"],
+                    }
+                )
+            recovered[index]["coverage"]["returned"] = len(recovered[index]["papers"])
+            for category, label in (
+                ("ambiguous", "ambiguous bibliography item(s)"),
+                ("unresolved", "unresolved identifier/item(s)"),
+            ):
+                if examples := issues[index][category]:
+                    count = recovered[index]["coverage"][category]
+                    recovered[index]["errors"].append(
+                        compact(f"arXiv primary: {count} {label}; examples: " + ", ".join(examples))
+                    )
+        return recovered
 
     async def _openalex_references(self, paper: dict) -> list[dict]:
         refs = [ref[3:] for ref in paper["refs"] if ref.startswith("oa:")]
@@ -488,7 +811,9 @@ class Papers:
                 raise ValueError("OpenAlex has no identifier for this paper")
             for oa_id in oa_ids:
                 raw = await self.web.json(f"{OA}/{oa_id}?select=referenced_works")
-                refs += [ref.rsplit("/", 1)[-1] for ref in raw.get("referenced_works") or []]
+                if not isinstance(raw.get("referenced_works"), list):
+                    raise ValueError("OpenAlex reference list unavailable")
+                refs += [ref.rsplit("/", 1)[-1] for ref in raw["referenced_works"]]
         batches = [refs[i : i + 100] for i in range(0, min(len(refs), 300), 100)]
         pages = await asyncio.gather(
             *(

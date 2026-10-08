@@ -21,12 +21,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
 from statistics import mean
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -123,8 +124,17 @@ def normalize(text):
     return " ".join(re.findall(r"[^\W_]+", (text or "").casefold()))
 
 
+def normalize_title(text):
+    """Equivalent Unicode and simple math-subscript renderings, with no fuzzy matching."""
+    text = unicodedata.normalize("NFKC", text or "")
+    for expression in re.findall(r"\$[^$]+\$", text):
+        rendered = re.sub(r"_\{([^\W_]+)\}|_([^\W_])", r"\1\2", expression)
+        text = text.replace(expression, rendered)
+    return normalize(text)
+
+
 def same_title(first, second):
-    a, b = normalize(first), normalize(second)
+    a, b = normalize_title(first), normalize_title(second)
     if not a or not b:
         return False
     return a == b
@@ -163,15 +173,39 @@ def bibliography_match(items, paper):
             and str(paper["year"]) in text
             and surname
             and surname in normalize(text).split()
-            and any(normalize(title) == normalize(paper["title"]) for title in titles)
+            and any(same_title(title, paper["title"]) for title in titles)
         ):
             return {"source": "primary_title_authors_year", "reference": text}
+    return None
+
+
+def preprint_identifier(url):
+    """Canonical DOI for a manuscript URL on bioRxiv or medRxiv."""
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return None
+    if parsed.scheme in {"http", "https"} and parsed.netloc.lower() in {
+        "biorxiv.org",
+        "www.biorxiv.org",
+        "medrxiv.org",
+        "www.medrxiv.org",
+    }:
+        # These hosts append a manuscript version to the DOI, not to its registration.
+        if match := re.fullmatch(
+            r"/content/(10\.1101/[0-9]+(?:\.[0-9]+)*)(?:v[0-9]+)?"
+            r"(?:\.(?:full|abstract)(?:\.pdf)?)?/?",
+            parsed.path,
+        ):
+            return "DOI:" + match.group(1)
     return None
 
 
 def url_identifier(url):
     """A paper ID from a URL: arXiv, DOI, OpenAlex, Semantic Scholar, or a DOI in the path."""
     url = (url or "").strip()
+    if pid := preprint_identifier(url):
+        return pid
     try:
         return identifier(url)
     except ValueError:
@@ -321,7 +355,7 @@ class Resolver:
                     metadata
                     and surname
                     and metadata.title
-                    and normalize(metadata.title) == normalize(paper["title"])
+                    and same_title(metadata.title, paper["title"])
                     and surname in normalize(metadata.author).split()
                 )
             soup = BeautifulSoup(data, "html.parser")
@@ -334,9 +368,7 @@ class Resolver:
                     if pid := url_identifier(value):
                         if target := await self.lookup(pid):
                             return bool(stable_keys(target) & stable_keys(paper))
-            return bool(metadata.get("citation_title")) and normalize(
-                metadata["citation_title"]
-            ) == normalize(paper["title"])
+            return same_title(metadata.get("citation_title"), paper["title"])
         except (RuntimeError, ValueError, TimeoutError, OSError, PdfReadError):
             return False
 
@@ -472,7 +504,7 @@ def paper_line(index, paper, label=None):
     return f"{index}. {paper['title']} ({year})" + (f" [{label}]" if label else "")
 
 
-async def check_facts(attempts, tasks, resolver, since):
+async def check_facts(attempts, tasks, resolver, since, today):
     """Resolve every paper, anchor and citation claim; attach facts to each attempt."""
     await resolver.prefetch(
         [a["id"] for task in tasks.values() for a in task["anchors"]]
@@ -509,7 +541,17 @@ async def check_facts(attempts, tasks, resolver, since):
                 "paper": paper,
             }
             if paper:
-                entry["recent"] = bool((paper["date"] or str(paper["year"] or "")) >= since)
+                try:
+                    first = last = date.fromisoformat(paper["date"] or "").isoformat()
+                except ValueError:
+                    year = paper["year"]
+                    first = f"{year:04d}-01-01" if year else ""
+                    last = f"{year:04d}-12-31" if year else ""
+                # A year alone cannot establish publication inside a boundary year.
+                entry["recent"] = bool(first and since <= first <= last <= today)
+                entry["recent_date_unverified"] = bool(
+                    first and first <= today and last >= since and not entry["recent"]
+                )
                 entry["quote_found"] = None
                 if quote_text(entry["quote"]):
                     found = quote_text(entry["quote"]) in quote_text(paper["abstract"])
@@ -526,9 +568,11 @@ async def check_facts(attempts, tasks, resolver, since):
             try:
                 pid = identifier(url)
             except ValueError:
-                pid = None
-            wanted = {pid.split(":", 1)[0].lower() + ":" + pid.split(":", 1)[1]} if pid else set()
-            wanted = {re.sub(r"v\d+$", "", k) for k in wanted}
+                pid = preprint_identifier(url)
+            wanted = set()
+            if pid:
+                prefix, tail = pid.split(":", 1)
+                wanted.add(prefix.lower() + ":" + (arxiv_base(tail) if prefix == "ARXIV" else tail))
             return next(
                 (
                     e
@@ -961,7 +1005,7 @@ def main():
 
     async def facts():
         try:
-            await check_facts(attempts, tasks, resolver, since)
+            await check_facts(attempts, tasks, resolver, since, today.isoformat())
         finally:
             await resolver.web.close()
             resolver.store.close()
@@ -1033,7 +1077,7 @@ def main():
                     for r in attempts
                 },
                 "judge": {"model": args.model, "effort": args.effort},
-                "grading_revision": 3,
+                "grading_revision": 4,
                 "pairwise_anonymization": "explicit_tool_names",
                 "source_run": str(source),
                 "offline": args.offline,

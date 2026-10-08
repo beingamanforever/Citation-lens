@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -17,6 +18,8 @@ from citation_lens.papers import (
     merge,
     strict_terms,
 )
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.mark.parametrize(
@@ -61,13 +64,27 @@ def test_openalex_record_rebuilds_abstract_and_arxiv_identity():
     assert paper["url"] == "https://arxiv.org/abs/2205.14135" and paper["year"] == 2022
 
 
+def test_provider_whitespace_is_not_treated_as_abstract_evidence():
+    paper = from_s2(
+        {
+            "paperId": "a" * 40,
+            "title": "Paper awaiting evidence",
+            "abstract": " \n\t ",
+            "externalIds": {},
+        }
+    )
+    assert paper["abstract"] == "" and paper["abstract_source"] is None
+
+
 def test_arxiv_feed_parsing_skips_error_entries():
     feed = b"""<feed xmlns="http://www.w3.org/2005/Atom"
-      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"
+      xmlns:arxiv="http://arxiv.org/schemas/atom">
       <opensearch:totalResults>7</opensearch:totalResults>
       <entry><id>http://arxiv.org/abs/2401.00001v2</id><title>New
       Attention</title><summary> Fresh   preprint. </summary>
-      <published>2026-05-01T00:00:00Z</published><author><name>A. Author</name></author></entry>
+      <published>2026-05-01T00:00:00Z</published><author><name>A. Author</name></author>
+      <arxiv:doi> HTTPS://DOI.ORG/10.1234/Published-Version </arxiv:doi></entry>
       <entry><id>http://arxiv.org/api/errors#bad_query</id><title>Error</title></entry>
     </feed>"""
     papers, total = from_arxiv(feed)
@@ -75,6 +92,18 @@ def test_arxiv_feed_parsing_skips_error_entries():
     assert papers[0]["id"] == "ARXIV:2401.00001" and papers[0]["date"] == "2026-05-01"
     assert papers[0]["title"] == "New Attention" and papers[0]["abstract"] == "Fresh preprint."
     assert papers[0]["abstract_source"] == "arxiv"
+    assert papers[0]["doi"] == "10.1234/published-version"
+    assert "doi:10.1234/published-version" in keys(papers[0])
+    publication = from_openalex(
+        {
+            "id": "https://openalex.org/W9",
+            "title": "Published New Attention",
+            "doi": "https://doi.org/10.1234/published-version",
+        }
+    )
+    merged, owners = merge([papers[0], publication])
+    assert len(merged) == 1 and owners == ["ARXIV:2401.00001", "ARXIV:2401.00001"]
+    assert merged[0]["oa"] == "W9" and merged[0]["doi"] == "10.1234/published-version"
 
 
 def test_merge_joins_versions_and_maps_every_input():
@@ -222,14 +251,79 @@ def test_merge_tracks_the_provider_of_the_selected_abstract():
     assert paper["abstract_source"] == "openalex"
 
 
-def test_strict_providers_get_the_first_content_words():
+def test_strict_providers_remove_stopwords_and_keep_phrases():
     assert strict_terms("the exact attention for memory and online softmax") == [
         "exact",
         "attention",
         "memory",
         "online",
+        "softmax",
     ]
     assert strict_terms('"online softmax" normalizer') == ['"online softmax"', "normalizer"]
+
+
+def test_strict_provider_search_keeps_all_terms_phrases_and_one_request_per_query(
+    store, monkeypatch
+):
+    requests = []
+    empty_feed = b"""<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+      <opensearch:totalResults>0</opensearch:totalResults></feed>"""
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        requests.append((request.headers["host"], dict(request.url.params)))
+        if request.headers["host"] == "api.openalex.org":
+            return httpx.Response(200, json={"results": [], "meta": {"count": 0}})
+        return httpx.Response(200, content=empty_feed)
+
+    async def exercise():
+        search = provider(store, respond)
+        long_query = '"adaptive state" routing for sparse sequence recall'
+        short_query = "routing and recall"
+        assert await search.search(long_query, "openalex", 25) == ([], 0)
+        assert await search.search(long_query, "arxiv", 25) == ([], 0)
+        assert await search.search(short_query, "openalex", 25) == ([], 0)
+        search.web.next_at["export.arxiv.org"] = -1e9
+        assert await search.search(short_query, "arxiv", 25) == ([], 0)
+        await search.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+
+    assert len(requests) == 4
+    assert requests[0][1]["search.title_and_abstract"] == (
+        '"adaptive state" routing sparse sequence recall'
+    )
+    assert requests[1][1]["search_query"] == (
+        '((ti:"adaptive state" OR abs:"adaptive state") AND '
+        '(ti:"routing" OR abs:"routing") AND (ti:"sparse" OR abs:"sparse") AND '
+        '(ti:"sequence" OR abs:"sequence") AND (ti:"recall" OR abs:"recall"))'
+    )
+    assert requests[2][1]["search.title_and_abstract"] == "routing recall"
+    assert requests[3][1]["search_query"] == (
+        '((ti:"routing" OR abs:"routing") AND (ti:"recall" OR abs:"recall"))'
+    )
+
+
+def test_search_provider_failure_remains_explicit_without_fallback(store):
+    request_count = 0
+
+    async def respond(_request):
+        nonlocal request_count
+        request_count += 1
+        return httpx.Response(404)
+
+    async def exercise():
+        search = provider(store, respond)
+        with pytest.raises(RuntimeError, match="api.openalex.org: HTTP 404"):
+            await search.search("routing recall", "openalex", 25)
+        await search.web.close()
+
+    run(exercise())
+    assert request_count == 1
 
 
 def test_a_conflicting_record_cannot_steal_a_shared_title():
@@ -264,12 +358,13 @@ def test_batched_references_map_back_by_input_order_and_fall_back(store):
 
     async def exercise():
         papers = provider(store, respond)
+        papers.web.attempts = 1
         a = s2("x", "Seed A", arxiv="2205.14135") | {"s2": ""}
         b = s2("y", "Seed B", arxiv="2112.05682") | {"s2": ""}
         refs_a, refs_b = await papers.references([a, b])
-        assert [p["title"] for p in refs_a] == ["Online Softmax"]
-        assert isinstance(refs_b, Exception)
-        assert "openalex" in str(refs_b)
+        assert [p["title"] for p in refs_a["papers"]] == ["Online Softmax"]
+        assert refs_a["coverage"] == {"source": "semantic_scholar", "returned": 1}
+        assert any("openalex" in error.casefold() for error in refs_b["errors"])
         await papers.web.close()
 
     run(exercise())
@@ -288,21 +383,151 @@ def test_references_preserve_an_authoritative_empty_s2_result(store):
     async def exercise():
         papers = provider(store, respond)
         seed = s2("a", "Seed Paper")
-        assert await papers.references([seed]) == [[]]
+        result = (await papers.references([seed]))[0]
+        assert result == {
+            "papers": [],
+            "errors": [],
+            "coverage": {"source": "semantic_scholar", "returned": 0},
+            "evidence": [],
+        }
         assert openalex_requests == 0
         await papers.web.close()
 
     run(exercise())
 
 
-def test_references_preserve_an_authoritative_empty_openalex_result(store):
+def test_non_arxiv_reference_lookup_uses_the_bounded_provider_stage(store, monkeypatch):
     async def respond(request):
         if request.url.path.endswith("/paper/batch"):
+            await asyncio.sleep(0.05)
+            return httpx.Response(200, json=[])
+        return httpx.Response(503)
+
+    async def exercise():
+        papers = provider(store, respond)
+        papers.web.attempts = 1
+        seed = from_s2(
+            {
+                "paperId": "a" * 40,
+                "title": "Journal seed",
+                "externalIds": {"DOI": "10.1000/journal"},
+            }
+        )
+        result = (await papers.references([seed]))[0]
+        assert result["papers"] == []
+        assert result["coverage"]["source"] == "unavailable"
+        assert any("semantic scholar" in error.casefold() for error in result["errors"])
+        await papers.web.close()
+
+    monkeypatch.setattr(papers_module, "REFERENCE_PROVIDER_SECONDS", 0.01)
+    run(exercise())
+
+
+def test_mixed_healthy_seeds_share_one_semantic_scholar_batch(store):
+    s2_requests = 0
+
+    async def respond(request):
+        nonlocal s2_requests
+        assert request.url.path.endswith("/paper/batch")
+        s2_requests += 1
+        return httpx.Response(
+            200,
+            json=[
+                {"references": [{"paperId": "c" * 40, "title": "arXiv reference"}]},
+                {"references": [{"paperId": "d" * 40, "title": "Journal reference"}]},
+            ],
+        )
+
+    async def exercise():
+        papers = provider(store, respond)
+        arxiv_seed = s2("a", "arXiv seed", arxiv="2205.14135")
+        journal_seed = from_s2(
+            {
+                "paperId": "b" * 40,
+                "title": "Journal seed",
+                "externalIds": {"DOI": "10.1000/journal"},
+            }
+        )
+        results = await papers.references([arxiv_seed, journal_seed])
+        assert [result["coverage"]["source"] for result in results] == [
+            "semantic_scholar",
+            "semantic_scholar",
+        ]
+        assert [result["papers"][0]["title"] for result in results] == [
+            "arXiv reference",
+            "Journal reference",
+        ]
+        await papers.web.close()
+
+    run(exercise())
+    assert s2_requests == 1
+
+
+def test_malformed_s2_reference_only_falls_back_for_its_seed(store):
+    async def respond(request):
+        if request.url.path.endswith("/paper/batch"):
+            return httpx.Response(
+                200,
+                json=[
+                    {"references": [{"paperId": "c" * 40, "title": "Valid S2 reference"}]},
+                    {
+                        "references": [
+                            {
+                                "paperId": "d" * 40,
+                                "title": "Invalid S2 reference",
+                                "publicationDate": "unknown",
+                            }
+                        ]
+                    },
+                ],
+            )
+        if request.url.path.endswith("/works/Wseed"):
+            return httpx.Response(
+                200, json={"referenced_works": ["https://openalex.org/Wfallback"]}
+            )
+        if request.url.path == "/works":
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "id": "https://openalex.org/Wfallback",
+                            "title": "Fallback OpenAlex reference",
+                            "publication_year": 2022,
+                        }
+                    ]
+                },
+            )
+        raise AssertionError(str(request.url))
+
+    async def exercise():
+        papers = provider(store, respond)
+        valid_seed = s2("a", "Valid seed")
+        malformed_seed = s2("b", "Malformed seed") | {"refs": ["oa:Wseed"]}
+        valid, recovered = await papers.references([valid_seed, malformed_seed])
+        assert [paper["title"] for paper in valid["papers"]] == ["Valid S2 reference"]
+        assert valid["coverage"]["source"] == "semantic_scholar"
+        assert [paper["title"] for paper in recovered["papers"]] == ["Fallback OpenAlex reference"]
+        assert recovered["coverage"]["source"] == "openalex"
+        assert any("reference metadata" in error.casefold() for error in recovered["errors"])
+        await papers.web.close()
+
+    run(exercise())
+
+
+def test_references_preserve_an_authoritative_empty_openalex_result(store):
+    primary_requests = 0
+
+    async def respond(request):
+        nonlocal primary_requests
+        if request.url.path.endswith("/paper/batch"):
             return httpx.Response(503)
-        if request.url.path.endswith("/works/doi:10.1000/seed"):
+        if request.url.path.endswith("/works/doi:10.48550/arxiv.2205.14135"):
             return httpx.Response(200, json={"id": "https://openalex.org/W1"})
         if request.url.path.endswith("/works/W1"):
             return httpx.Response(200, json={"referenced_works": []})
+        if request.headers["host"] == "arxiv.org":
+            primary_requests += 1
         raise AssertionError(str(request.url))
 
     async def exercise():
@@ -312,10 +537,13 @@ def test_references_preserve_an_authoritative_empty_openalex_result(store):
             {
                 "paperId": "a" * 40,
                 "title": "Seed Paper",
-                "externalIds": {"DOI": "10.1000/seed"},
+                "externalIds": {"ArXiv": "2205.14135"},
             }
         )
-        assert await papers.references([seed]) == [[]]
+        result = (await papers.references([seed]))[0]
+        assert result["papers"] == [] and result["evidence"] == []
+        assert result["coverage"] == {"source": "openalex", "returned": 0}
+        assert primary_requests == 0
         await papers.web.close()
 
     run(exercise())
@@ -338,8 +566,8 @@ def test_references_return_openalex_identity_failure(store):
             }
         )
         result = (await papers.references([seed]))[0]
-        assert isinstance(result, Exception)
-        assert "openalex" in str(result)
+        assert result["papers"] == []
+        assert any("openalex" in error.casefold() for error in result["errors"])
         await papers.web.close()
 
     run(exercise())
@@ -360,11 +588,277 @@ def test_references_report_both_provider_failures(store):
             }
         )
         result = (await papers.references([seed]))[0]
-        assert isinstance(result, Exception)
-        assert "semantic scholar" in str(result).casefold()
-        assert "openalex" in str(result).casefold()
+        message = "; ".join(result["errors"]).casefold()
+        assert "semantic scholar" in message
+        assert "openalex" in message
         await papers.web.close()
 
+    run(exercise())
+
+
+def test_references_recover_explicit_primary_arxiv_identifiers_after_index_outage(
+    store, monkeypatch
+):
+    requests = []
+    bibliography = (FIXTURES / "arxiv-bibliography.html").read_bytes()
+    feed = b"""<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:arxiv="http://arxiv.org/schemas/atom"
+      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+      <opensearch:totalResults>1</opensearch:totalResults>
+      <entry><id>http://arxiv.org/abs/2101.00001v4</id>
+      <title>Hydrated primary reference</title><arxiv:doi>10.1000/alias</arxiv:doi>
+      <published>2021-01-01T00:00:00Z</published></entry>
+    </feed>"""
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        host = request.headers["host"]
+        requests.append((host, request.url.path, dict(request.url.params)))
+        if host == "api.semanticscholar.org":
+            return httpx.Response(200, json=[{}])
+        if host == "api.openalex.org":
+            if request.url.path.endswith("/works/doi:10.48550/arxiv.2205.14135"):
+                return httpx.Response(200, json={"id": "https://openalex.org/W1"})
+            return httpx.Response(200, json={})  # missing referenced_works is unavailable
+        if host == "arxiv.org":
+            return httpx.Response(200, content=bibliography)
+        if host == "export.arxiv.org":
+            return httpx.Response(200, content=feed)
+        raise AssertionError(str(request.url))
+
+    async def exercise():
+        papers = provider(store, respond)
+        papers.web.attempts = 1
+        papers.remember(
+            from_s2(
+                {
+                    "paperId": "c" * 40,
+                    "title": "Cached DOI reference",
+                    "externalIds": {"DOI": "10.1000/cached"},
+                }
+            )
+        )
+        seed = s2("a", "Versioned Seed", arxiv="2205.14135v3") | {"s2": ""}
+        result = (await papers.references([seed]))[0]
+
+        assert [paper["id"] for paper in result["papers"]] == [
+            "ARXIV:2101.00001",
+            "DOI:10.1000/cached",
+        ]
+        assert result["coverage"] == {
+            "source": "primary_arxiv",
+            "returned": 2,
+            "total": 6,
+            "inspected": 6,
+            "identified": 5,
+            "unidentified": 1,
+            "ambiguous": 1,
+            "unresolved": 1,
+            "truncated": 0,
+            "metadata_truncated": 0,
+        }
+        assert result["evidence"] == [
+            {
+                "cited": "ARXIV:2101.00001",
+                "matched_id": "ARXIV:2101.00001",
+                "source": "primary_arxiv",
+                "url": "https://arxiv.org/html/2205.14135v3#bib.primary",
+            },
+            {
+                "cited": "DOI:10.1000/cached",
+                "matched_id": "DOI:10.1000/cached",
+                "source": "primary_arxiv",
+                "url": "https://arxiv.org/html/2205.14135v3#bib.cached-doi",
+            },
+        ]
+        message = "; ".join(result["errors"])
+        assert "ambiguous bibliography" in message
+        assert "DOI:10.1000/unresolved" in message
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+
+    assert [host for host, _, _ in requests] == [
+        "api.semanticscholar.org",
+        "api.openalex.org",
+        "api.openalex.org",
+        "arxiv.org",
+        "export.arxiv.org",
+    ]
+    assert requests[-1][2]["id_list"] == "2101.00001"
+
+
+def test_primary_reference_fallback_reports_missing_bibliography_markup(store, monkeypatch):
+    metadata_requests = 0
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        nonlocal metadata_requests
+        host = request.headers["host"]
+        if host == "api.semanticscholar.org":
+            return httpx.Response(200, json=[{}])
+        if host == "api.openalex.org":
+            return httpx.Response(503)
+        if host == "arxiv.org":
+            return httpx.Response(200, content=b"<html><p>malformed bibliography")
+        metadata_requests += 1
+        return httpx.Response(500)
+
+    async def exercise():
+        papers = provider(store, respond)
+        papers.web.attempts = 1
+        seed = s2("a", "Seed", arxiv="2205.14135") | {"s2": ""}
+        result = (await papers.references([seed]))[0]
+        assert result["papers"] == [] and result["evidence"] == []
+        assert any("no bibliography items" in error for error in result["errors"])
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+    assert metadata_requests == 0
+
+
+def test_primary_reference_diagnostics_bound_long_identifiers_and_fragments(store, monkeypatch):
+    long_suffix = "x" * 5000
+    html = f"""
+    <ol>
+      <li class="ltx_bibitem" id="doi-item">
+        <a href="https://doi.org/10.1000/{long_suffix}">DOI</a>
+      </li>
+      <li class="ltx_bibitem" id="{long_suffix}">
+        <a href="https://arxiv.org/abs/2101.00001">first</a>
+        <a href="https://arxiv.org/abs/2102.00002">second</a>
+      </li>
+    </ol>
+    """.encode()
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        assert request.headers["host"] == "arxiv.org"
+        return httpx.Response(200, content=html)
+
+    async def exercise():
+        papers = provider(store, respond)
+        seed = s2("a", "Seed", arxiv="2205.14135")
+        result = (await papers._primary_references([(0, seed)]))[0]
+        assert result["coverage"]["unresolved"] == 1
+        assert result["coverage"]["ambiguous"] == 1
+        assert all(len(error) <= 160 for error in result["errors"])
+        assert all("[truncated]" in error for error in result["errors"])
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+
+
+def test_primary_reference_caps_are_round_robin_across_seeds(store, monkeypatch):
+    metadata_batches = []
+
+    def bibliography(prefix):
+        items = "".join(
+            f'<li class="ltx_bibitem" id="bib.{number}">'
+            f'<a href="https://arxiv.org/abs/{prefix}.{number:05d}">ref</a></li>'
+            for number in range(1, 102)
+        )
+        return f"<html><ol>{items}</ol></html>".encode()
+
+    def feed(ids):
+        entries = "".join(
+            f"<entry><id>http://arxiv.org/abs/{paper_id}</id><title>{paper_id}</title>"
+            "<published>2020-01-01T00:00:00Z</published></entry>"
+            for paper_id in ids
+        )
+        return (
+            '<feed xmlns="http://www.w3.org/2005/Atom" '
+            'xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">'
+            f"<opensearch:totalResults>{len(ids)}</opensearch:totalResults>{entries}</feed>"
+        ).encode()
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        host = request.headers["host"]
+        if host == "api.semanticscholar.org":
+            return httpx.Response(200, json=[{}, {}])
+        if host == "api.openalex.org":
+            return httpx.Response(503)
+        if host == "arxiv.org":
+            prefix = "2401" if request.url.path.endswith("2501.00001") else "2402"
+            return httpx.Response(200, content=bibliography(prefix))
+        ids = request.url.params["id_list"].split(",")
+        metadata_batches.append(ids)
+        return httpx.Response(200, content=feed(ids))
+
+    async def exercise():
+        papers = provider(store, respond)
+        papers.web.attempts = 1
+        seeds = [
+            s2("a", "First Seed", arxiv="2501.00001") | {"s2": ""},
+            s2("b", "Second Seed", arxiv="2502.00001") | {"s2": ""},
+        ]
+        results = await papers.references(seeds)
+        assert [len(result["papers"]) for result in results] == [50, 50]
+        assert all(result["coverage"]["inspected"] == 100 for result in results)
+        assert all(
+            any("inspected 100/101" in error for error in result["errors"]) for result in results
+        )
+        assert all(any("50 uncached" in error for error in result["errors"]) for result in results)
+        assert all(len(result["errors"]) < 8 for result in results)
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+
+    assert len(metadata_batches) == 1 and len(metadata_batches[0]) == 100
+    assert sum(paper_id.startswith("2401.") for paper_id in metadata_batches[0]) == 50
+    assert sum(paper_id.startswith("2402.") for paper_id in metadata_batches[0]) == 50
+
+
+def test_primary_metadata_timeout_keeps_cached_doi_references(store, monkeypatch):
+    bibliography = (FIXTURES / "arxiv-bibliography.html").read_bytes()
+    never_respond = asyncio.Event()
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        host = request.headers["host"]
+        if host in {"api.semanticscholar.org", "api.openalex.org"}:
+            return httpx.Response(503)
+        if host == "arxiv.org":
+            return httpx.Response(200, content=bibliography)
+        await never_respond.wait()
+        return httpx.Response(200)
+
+    async def exercise():
+        papers = provider(store, respond)
+        papers.web.attempts = 1
+        papers.remember(
+            from_s2(
+                {
+                    "paperId": "c" * 40,
+                    "title": "Cached DOI reference",
+                    "externalIds": {"DOI": "10.1000/cached"},
+                }
+            )
+        )
+        seed = s2("a", "Seed", arxiv="2205.14135") | {"s2": ""}
+        result = (await papers.references([seed]))[0]
+        assert [paper["id"] for paper in result["papers"]] == ["DOI:10.1000/cached"]
+        assert any("arxiv metadata" in error.casefold() for error in result["errors"])
+        assert not papers.web.pending
+        await papers.web.close()
+
+    monkeypatch.setattr(papers_module, "PRIMARY_REFERENCE_SECONDS", 0.05)
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
     run(exercise())
 
 
@@ -519,3 +1013,124 @@ def test_resolve_many_falls_back_to_free_openalex_when_s2_is_throttled(store):
         await papers.web.close()
 
     run(exercise())
+
+
+def test_resolve_many_reuses_complete_cached_native_abstracts_without_http(store):
+    async def respond(request):
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    async def exercise():
+        papers = provider(store, respond)
+        arxiv = papers.remember(
+            from_openalex(
+                {
+                    "id": "https://openalex.org/W1",
+                    "title": "Complete cached preprint",
+                    "ids": {"arxiv": "https://arxiv.org/abs/2401.00001"},
+                    "abstract_inverted_index": {"Complete": [0], "evidence.": [1]},
+                }
+            )
+        )
+        openalex = papers.remember(
+            from_openalex(
+                {
+                    "id": "https://openalex.org/W2",
+                    "title": "Complete cached journal paper",
+                    "abstract_inverted_index": {"Journal": [0], "evidence.": [1]},
+                }
+            )
+        )
+        found = await papers.resolve_many(["ARXIV:2401.00001v3", "OA:W2"])
+        assert [paper["id"] for paper in found] == [arxiv["id"], openalex["id"]]
+        assert [paper["abstract"] for paper in found] == [
+            "Complete evidence.",
+            "Journal evidence.",
+        ]
+        assert papers.web.requests == 0
+        await papers.web.close()
+
+    run(exercise())
+
+
+def test_resolve_many_enriches_only_missing_evidence_in_a_mixed_batch(store):
+    requests = []
+
+    async def respond(request):
+        requests.append(str(request.url))
+        if request.url.path.endswith("/paper/batch"):
+            assert json.loads(request.content)["ids"] == [
+                "arXiv:2402.00002",
+                "DOI:10.1234/uncached",
+            ]
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "paperId": "a" * 40,
+                        "title": "Enriched cached preprint",
+                        "abstract": "Recovered preprint abstract.",
+                        "externalIds": {"ArXiv": "2402.00002"},
+                    },
+                    {
+                        "paperId": "b" * 40,
+                        "title": "New DOI paper",
+                        "abstract": "Resolved DOI abstract.",
+                        "externalIds": {"DOI": "10.1234/uncached"},
+                    },
+                ],
+            )
+        if request.url.path == "/works/W3":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "https://openalex.org/W3",
+                    "title": "Refreshed OpenAlex paper",
+                    "abstract_inverted_index": {"Recovered": [0], "journal": [1], "abstract.": [2]},
+                },
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    async def exercise():
+        papers = provider(store, respond)
+        complete = papers.remember(
+            from_openalex(
+                {
+                    "id": "https://openalex.org/W1",
+                    "title": "Already complete",
+                    "ids": {"arxiv": "https://arxiv.org/abs/2401.00001"},
+                    "abstract_inverted_index": {"Cached": [0], "abstract.": [1]},
+                }
+            )
+        )
+        incomplete_arxiv = papers.remember(
+            from_openalex(
+                {
+                    "id": "https://openalex.org/W2",
+                    "title": "Incomplete preprint",
+                    "ids": {"arxiv": "https://arxiv.org/abs/2402.00002"},
+                }
+            )
+        )
+        incomplete_openalex = papers.remember(
+            from_openalex({"id": "https://openalex.org/W3", "title": "Incomplete journal paper"})
+        )
+        found = await papers.resolve_many(
+            [complete["id"], incomplete_arxiv["id"], incomplete_openalex["id"], "10.1234/uncached"]
+        )
+        assert [paper["id"] for paper in found] == [
+            complete["id"],
+            incomplete_arxiv["id"],
+            incomplete_openalex["id"],
+            "DOI:10.1234/uncached",
+        ]
+        assert [paper["abstract"] for paper in found] == [
+            "Cached abstract.",
+            "Recovered preprint abstract.",
+            "Recovered journal abstract.",
+            "Resolved DOI abstract.",
+        ]
+        await papers.web.close()
+
+    run(exercise())
+    assert len(requests) == 2
+    assert not any("2401.00001" in request or "W1" in request for request in requests)

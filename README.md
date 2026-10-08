@@ -9,12 +9,17 @@ Give it a research question; it finds the defining papers, walks their citation 
    A recent lane reserves every third card for work from the last two years when available.
 2. **Expand the citation graph.** From 3-6 seed papers Lens collects their references, their citing papers (newest from Semantic Scholar, most cited from OpenAlex) and Semantic Scholar's similar papers, then reads the candidates' own reference lists to measure bibliographic coupling and co-citation.
    Neighbors come back in three lanes: **foundation** (prior work the graph cites), **follow-up** (work that cites or resembles the seeds, ranked by shared references) and **recent** (the last two years).
-3. **Preview, then read.** A card is about 500 bytes: ID, title, year, citations, URL, why it was chosen, and one verbatim abstract sentence matching the query.
+3. **Preview, then read.** Compact cards identify the paper, explain its selection and carry a verbatim abstract excerpt.
    Abstracts, full text and figures are separate, on-demand calls.
    Snapshots page from a local cache without new requests.
-4. **Cite real links.** Edges are citing -> cited pairs taken from reference lists; shared references and similarity are labeled as such and never reported as citations.
+   Complete cached abstracts read locally; publisher DOI aliases stay attached to arXiv records.
+   Shared downloads, provider deadlines and throttling pauses avoid repeated work and bound waits.
+4. **Cite real links.** Edges are citing -> cited pairs taken from reference lists.
+   If citation indexes fail, arXiv bibliographies can supply backward links with a source fragment and matched paper ID; unresolved references remain visible.
+   Shared references and similarity never become citation links.
 
 The agent stays in charge of judgment: Lens gathers, ranks and previews; the agent screens, verifies and writes.
+Verified DOI or arXiv IDs found through native search can go straight to reading, without another title search.
 
 ## Install
 
@@ -64,10 +69,13 @@ It does not meet our Claude quality goal yet: higher paper counts came with lowe
 
 Failed attempts receive zero quality credit.
 Three Codex timeouts lack token usage; token means exclude them.
-These are keyless, snapshot-specific measurements with model-based judges.
+These are historical keyless measurements with model-based judges, from the packages recorded in each export.
 Inspected tasks become regression cases for future changes; new behavior needs fresh held-out evidence.
+Three later development candidates failed the saved quality and efficiency requirements.
+Version 0.2.1 ships separately verified correctness repairs; it has no demonstrated end-to-end performance gain.
 
 [Protocol, failures and reproduction](docs/EVALUATION.md) · [Codex evidence](docs/results/codex-heldout.json) · [Claude evidence](docs/results/claude-heldout.json)
+[Development comparisons](docs/DEVELOPMENT.md)
 
 [Design and research basis](docs/DESIGN.md) · [Privacy](docs/PRIVACY.md) ·
 [Development](docs/PUBLISHING.md) · [MIT license](LICENSE)
