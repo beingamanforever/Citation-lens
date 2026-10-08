@@ -1,140 +1,101 @@
-# Citation Lens: research and reviewed design
+# Design
 
-Goal: enable Codex and Claude Code to search a topic, snowball forward and backward,
-screen candidates, read selected evidence including visuals, then synthesize a cited review.
+Goal: given a research question, return more relevant, verified papers than an agent's own web search - the foundations, the most influential follow-ups and the newest work - with citation links that can be checked.
+Fast, and without flooding the agent's context.
 
-## Research findings
+## Principles
 
-- Wohlin's snowballing guidance supports iterative reference and citation screening,
-  with explicit inclusion/exclusion criteria and a defensible starting set:
-  https://www.wohlin.eu/ease14.pdf
-- Connected Papers uses co-citation and bibliographic coupling, not just a citation
-  tree. Citation Lens deliberately preserves direct, directed citations as a graph:
-  https://www.connectedpapers.com/about
-- This capability already exists in part. scholar-mcp has BFS traversal, citation
-  discovery, caching, and paged PDF conversion. papers-mcp has arXiv extraction
-  with figures/tables. We cannot claim citation traversal as novel:
-  https://github.com/pvliesdonk/scholar-mcp
-  https://github.com/wbopan/papers-mcp
-- PaperQA supplies evidence-oriented document retrieval. It is a larger RAG system;
-  here the existing harness performs screening and synthesis, avoiding another LLM
-  service, vector database, orchestration layer, and duplicate model costs:
-  https://github.com/Future-House/paper-qa
-- OpenAlex provides server-side citation filtering, sorting, field selection,
-  cursor paging, and batched ID resolution. Current docs cap a page at 100 and an
-  OR filter at 100. API keys improve anonymous budgets:
-  https://help.openalex.org/api/llm-quick-reference/
-  https://help.openalex.org/api/authentication/
-- Semantic Scholar supports arXiv/DOI IDs, citation contexts, and batched metadata
-  (500 IDs). Citation paging is not a guarantee of global citation-count ranking:
-  https://api.semanticscholar.org/graph/v1/swagger.json
-- Native arXiv HTML offers math, table structure, captions, and figure URLs. PDF
-  text alone cannot faithfully describe diagrams. Expose the original PDF page
-  or figure as an MCP image when the harness needs visual evidence:
-  https://arxiv.org/html/1706.03762
-- Jina Reader is a useful optional PDF/HTML fallback, but generated image captions
-  are not equivalent to seeing a figure and must not become authoritative evidence:
-  https://github.com/jina-ai/reader
-- Anthropic recommends meaningful, bounded tool responses and behavioral evals:
-  https://www.anthropic.com/engineering/writing-tools-for-agents
-- Codex and Claude Code support stdio MCP and packaged skills. Public OpenAI
-  directory submission of MCP plugins currently requires a remote HTTPS endpoint;
-  a local marketplace release is a distinct distribution route:
-  https://developers.openai.com/codex/mcp
-  https://developers.openai.com/plugins/build/plugins
-  https://code.claude.com/docs/en/plugins-reference
+- **The host agent reasons; Lens gathers.** Five composable tools, no embedded LLM, no autonomous research loop.
+  Codex or Claude Code decides what to search, which seeds to expand, what to read and what to conclude.
+- **Preview first, detail on demand.** Search and expansion return compact cards; abstracts, text and figures are separate calls.
+  Anthropic's tool guidance favors meaningful, bounded, paginated responses ([writing tools for agents][tools]).
+- **Parallel by default.** One search call runs every query on every provider concurrently; one expansion fetches every seed's neighbors concurrently.
+  Per-host pacing, retries and a local cache keep this polite and repeatable.
+- **Provenance stays visible.** Citation edges come only from reference lists and always point citing -> cited.
+  Similarity is labeled as similarity.
+  Failed or throttled providers are reported, never silently dropped.
+- **Recency is a lane, not a tie-break.** Citation counts lag; every result list reserves room for the last two years, including arXiv preprints too new for citation indexes.
 
-## Plan review and refinements before implementation
-
-| Initial idea | Problem | Refined design |
-| --- | --- | --- |
-| Citation tree | Shared ancestors, cross-links, cycles get duplicated | Canonical IDs and directed edge set |
-| Expand every paper recursively | Exponential requests and unrelated hubs | Explicit depth, beam, node and neighbor limits |
-| Most-cited only | Disadvantages recent work | Interleave relevant, recent, prominent candidates |
-| Entire PDFs in context | Token flood and poor selection | Cards, outline, text slices, selected visual |
-| Automatic LLM summaries | Cost, latency, unsupported compression | Abstract excerpts clearly labeled; harness writes evidence summaries |
-| Text-only extraction | Loses diagrams and PDF layout | HTML structure plus actual figure/page image |
-| Silent fallback | Hides gaps and index drift | Provider identity, sampling counts, errors, source URLs |
-| Build an autonomous research agent | Duplicates Codex/Claude reasoning | Five composable tools plus workflow guidance |
-
-## Architecture
+## The paradigm: search, expand, screen, verify
 
 ```mermaid
-flowchart TD
-    H["Codex / Claude Code"] --> S["Search: compact cards"]
-    S --> G["Expand: bounded citation graph"]
-    G --> V["Graph: screen and select"]
-    V --> R["Read: outline and text slices"]
-    R --> I["Visual: figure or PDF page"]
-    V --> G
-    S --> C["SQLite cache and graph snapshots"]
-    G --> C
-    R --> C
-    G --> P["OpenAlex / Semantic Scholar"]
+flowchart LR
+    Q[Question] --> S[research_search<br/>2-4 variants x 3 providers]
+    S --> P[Pick 3-6 seeds]
+    P --> E[research_expand<br/>refs, citers, similar]
+    E --> L[foundation / follow-up / recent lanes]
+    L --> V[research_read / research_visual<br/>only what cards cannot settle]
+    V --> A[Answer with quotes and citation edges]
+    L -. missing approach .-> P
 ```
 
-Edges always point from citing paper to cited paper. Traversal in either direction
-never reverses stored edges. No claim that a citation implies support.
+Citation expansion is the most consistently supported recall lever in agentic literature search: removing PaSa's expansion step cut recall by 23-32% ([PaSa][pasa]); one-hop expansion lifted BM25 recall@20 from 50.0 to 68.6 on LitSearch ([LitSearch][litsearch]); SPAR keeps expansion shallow because deeper chains drift off topic ([SPAR][spar]).
+Lens expands one hop per call and lets the agent re-seed.
 
-## Budgets and selection
+## Providers
 
-Default one hop, at most three; beam <= 8; graph <= 200 nodes; neighbors <= 40
-per seed per direction; text <= 12,000 characters per call. Pagination is explicit.
-MCP uses one compact JSON text block to avoid duplicate structured/text payloads.
-Each response includes its serialized UTF-8 byte count; this is an exact payload
-measurement, not a tokenizer-independent token claim. No full paper at discovery.
-OpenAlex samples both latest and most cited forward links, and batch-fetches
-backward references. Semantic Scholar samples bounded pages with a continuation
-and warning. Ranking is a transparent heuristic, never a SOTA or quality score.
+| Need | Source | Why |
+| --- | --- | --- |
+| Relevance search | Semantic Scholar, OpenAlex, arXiv | fused with reciprocal rank fusion |
+| Fresh preprints | arXiv sorted by submission date | not yet in citation indexes |
+| References | Semantic Scholar, OpenAlex fallback | OpenAlex lacks reference lists for many ML preprints |
+| Citing papers | Semantic Scholar (newest 1000), OpenAlex (most cited, overall and last two years) | S2 lists citers newest-first; OpenAlex sorts by citations |
+| Similar papers | Semantic Scholar recommendations | finds prominent follow-ups a newest-first citer list misses |
+| Coupling data | one Semantic Scholar batch of reference IDs for up to 400 candidates | measures shared references |
 
-Requests share a pooled async HTTP client, bounded concurrency, per-host pacing,
-retry-after-aware bounded retries, timeouts, byte limits, and persistent TTL cache.
-Single-flight coalesces identical in-process requests. No provider payload or
-credential is dumped into model context. Graph snapshots are resumable after restart.
+Records merge on arXiv ID, DOI, provider ID or exact long title; two different arXiv IDs never merge.
+The arXiv abstract is preferred as verbatim text, and the larger citation count wins.
 
-Native arXiv discovery includes preprints not yet in citation indexes and marks
-unresolved citation counts explicitly. Explicit arXiv revisions remain pinned.
+## Ranking
 
-## Evidence and visuals
+Search: `0.45 * fused rank + 0.25 * query match + 0.30 * citation percentile`, interleaved two relevance cards to one recent card.
+Strict-AND providers (OpenAlex, arXiv) get the first four content words of a query so long phrasings still match.
 
-HTML preferred when an arXiv ID exists. Preserve LaTeX annotations, Markdown tables,
-figure captions and URLs. PDF fallback retains page boundaries and supports page
-rendering. Text extraction warnings remain attached. Chunk offsets give lossless
-access to all stored text, with provenance URL and content hash. A figure/page
-image is requested separately, with caption/page identity. Nonvisual clients must
-report missing visual inspection. Neither abstracts nor captions prove SOTA.
+Expansion follows Connected Papers, which ranks by co-citation and bibliographic coupling ([about][cp]), and Inciteful, which weights shared references by Adamic/Adar ([Inciteful][inciteful]):
 
-## Tool efficiency refinement
+- coupling: shared references with the seeds, each weighted `1 / log(2 + its citations)`, divided by `sqrt(reference count)` so long bibliographies do not win by size;
+- co-citation: graph papers citing both the candidate and a seed;
+- in-degree: graph papers citing the candidate;
+- direct links and similar-to-seed recommendations; query match; citations and citations per year.
 
-The shared search tool accepts scalar inputs or up to three query variants across three providers.
-Batching uses the existing HTTP pool and pacing; it does not add another tool or orchestration service.
-Each attempt retains coverage or failure, identity aliases and contributing search indexes.
-Equivalent records prefer the earliest indexed full-text source without blending provider metrics.
-The discovery snapshot stores all candidates and returns ten cards; cached pages recover the rest.
-The bundled MCP Python client can filter those pages before printing its final result.
-Text pagination returns overview and figures once, preserving every text character and source warning.
+| Lane | Members | Score |
+| --- | --- | --- |
+| foundation | cited by a seed or by several relevant graph papers, older than two years | 0.45 in-degree, 0.15 co-citation, 0.2 match, 0.2 citations |
+| follow-up | cites the graph or resembles a seed, older than two years | 0.3 coupling, 0.2 direct, 0.15 similar, 0.2 match, 0.15 velocity |
+| recent | last two years | 0.25 coupling, 0.15 direct, 0.15 similar, 0.3 match, 0.15 velocity |
 
-[Advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) distinguishes host/API tool search and programmatic calling from server tools.
-[Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) motivates keeping intermediate results in the client.
-[Effective tool design](https://www.anthropic.com/engineering/writing-tools-for-agents) motivates bounded responses and executable usage examples.
-We measure complete as well as initial payloads; disjoint discovery can cost more because it retains provenance.
+Graph signals are percentiles within the candidate pool.
+In-degree and co-citation weigh each citing paper by its own query match (a seed counts fully), so papers that merely use a seed as a tool do not become foundations.
+A candidate stays if it matches the query, resembles a seed, or is cited by relevant papers worth at least 1.5 (two seeds suffice).
+Lanes are interleaved round-robin; each card names its lane and why it was chosen ("cited by 2/3 seeds; shares 12 seed refs").
 
-## Scope and ceilings
+## Context budget
 
-No scraping paywalls, GPU OCR, automatic claim generation, full-corpus graph, or
-hosted multi-user server in v0.1. Cross-provider records deduplicate by DOI/arXiv
-when available; title-only fuzzy merging is intentionally avoided. Metadata is
-incomplete and can lag recent preprints. Discovery is a bounded map, not a
-systematic-review completeness guarantee. Current best directions require reading
-methods/results and comparing compatible tasks, datasets, splits and compute.
+Measured in the evaluation runs (development iteration 4 and held-out):
 
-## Verification and release gates
+| Response | Size |
+| --- | --- |
+| Search, 20 cards | about 8 KB (20-27 KB when an agent asks for 45-60 cards) |
+| Expansion, 60 cards and at most 120 edges | 33-37 KB |
+| 25-30 abstracts in one read (first 1000 characters each) | 32-40 KB |
+| Whole Lens attempt | 106 KB on average |
 
-Deterministic provider contract fixtures; graph cycles/shared ancestors/direction;
-node/depth caps; recent low-citation inclusion; partial errors; cache TTL and
-single-flight; byte budgets; HTML math/tables/captions; PDF text and image;
-SSRF/redirect/input boundaries; SDK stdio initialization/tools/calls; build and
-manifest validation. Benchmark cached vs cold fixture requests and card vs document
-payloads. These measurements do not establish real internet latency or research
-quality. Live topic runs and blinded human screening remain gates for research
-quality claims and a stable release. The initial distribution is a preview.
+Each card carries one verbatim abstract sentence chosen for the query, so the agent can quote evidence without another call.
+Pages clamp to 60 cards and 120 edges, keeping the links that touch seeds and top-ranked cards.
+The previous design returned 45-120 KB per call, about 230 KB per attempt, and timed out in two of three attention trials.
+
+## Limits
+
+Keyless Semantic Scholar and arXiv throttle under load and OpenAlex's keyless budget is about 100 searches a day; free keys fix most of this.
+A host that stays throttled through every retry is skipped for a minute, so a saturated provider costs one failed call rather than every call.
+Citation indexes lag new preprints.
+Similarity recommendations cover computer science only.
+The graph is one hop per call, not a full corpus like Connected Papers'.
+Ranking weights are heuristics tuned on development tasks, not learned.
+
+[tools]: https://www.anthropic.com/engineering/writing-tools-for-agents
+[pasa]: https://arxiv.org/abs/2501.10120
+[litsearch]: https://arxiv.org/abs/2407.18940
+[spar]: https://arxiv.org/abs/2507.15245
+[cp]: https://www.connectedpapers.com/about
+[inciteful]: https://incitefulmed.com/academic/help/paper-disovery-explained.html

@@ -1,0 +1,728 @@
+{
+  "version": 3,
+  "created": "2026-10-08",
+  "freshness_months": 24,
+  "tasks": [
+    {
+      "name": "document_geometry",
+      "split": "development",
+      "kind": "survey",
+      "prompt": "Find research papers on document image deskewing and single-image dewarping. Distinguish global rotation from curved-page correction. Cover Fourier/projection methods, learned geometric mappings and at least one benchmark or evaluation paper. Include direct citation relationships between selected works when supported.",
+      "required_approaches": [
+        "rotation estimation",
+        "Fourier or projection method",
+        "learned dewarping",
+        "benchmark or evaluation"
+      ],
+      "anchors": [
+        {
+          "id": "DOI:10.1109/CVPR.2018.00494",
+          "title": "DocUNet: Document Image Unwarping via a Stacked U-Net",
+          "year": 2018,
+          "citations": 160,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1109/ICCV.2019.00022",
+          "title": "DewarpNet: Single-Image Document Unwarping With Stacked 3D and 2D Regression Networks",
+          "year": 2019,
+          "citations": 106,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2110.12942",
+          "title": "DocTr: Document Image Transformer for Geometric Unwarping and Illumination Correction",
+          "year": 2021,
+          "citations": 87,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2603.05942",
+          "title": "Adaptive Radial Projection on Fourier Magnitude Spectrum for Document Image Skew Estimation",
+          "year": 2022,
+          "citations": 3,
+          "role": "core"
+        },
+        {
+          "id": "DOI:10.1109/ICDAR.2013.291",
+          "title": "ICDAR 2013 Document Image Skew Estimation Contest (DISEC 2013)",
+          "year": 2013,
+          "citations": 17,
+          "role": "core"
+        }
+      ]
+    },
+    {
+      "name": "exact_attention",
+      "split": "development",
+      "kind": "survey",
+      "prompt": "Find research papers on memory-efficient exact attention. Cover foundational memory algorithms, GPU I/O-aware kernels, parallelism/work partitioning and distributed attention. Return exact-attention papers and applicable foundational algorithms in the paper list. Discuss approximation, low-precision variants and serving KV-cache policies as exclusions in limitations, rather than adding them to that list. Include supported direct citation relationships.",
+      "required_approaches": [
+        "memory reduction",
+        "GPU I/O",
+        "parallelism or work partitioning",
+        "distributed exact attention"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:2112.05682",
+          "title": "Self-attention Does Not Need $O(n^2)$ Memory",
+          "year": 2021,
+          "citations": 217,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2205.14135",
+          "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+          "year": 2022,
+          "citations": 5494,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2307.08691",
+          "title": "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning",
+          "year": 2023,
+          "citations": 3422,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2310.01889",
+          "title": "Ring Attention with Blockwise Transformers for Near-Infinite Context",
+          "year": 2023,
+          "citations": 604,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2603.05451",
+          "title": "FlashAttention-4: Algorithm and Kernel Pipelining Co-Design for Asymmetric Hardware Scaling",
+          "year": 2026,
+          "citations": 76,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "lora_lineage",
+      "split": "development",
+      "kind": "lineage",
+      "prompt": "Starting from the paper \"LoRA: Low-Rank Adaptation of Large Language Models\", map its research lineage. Identify the earlier parameter-efficient transfer and intrinsic-dimensionality work it builds on, then its most influential follow-ups, including memory-efficient and reparameterized variants. Include the most recent 2025-26 variants and analyses comparing low-rank adaptation with full fine-tuning, with supported direct citation relationships.",
+      "required_approaches": [
+        "pre-LoRA foundations",
+        "quantized or memory-efficient fine-tuning",
+        "decomposed or reparameterized variants",
+        "recent 2025-26 follow-ups and analyses"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:1902.00751",
+          "title": "Parameter-Efficient Transfer Learning for NLP",
+          "year": 2019,
+          "citations": 7469,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2012.13255",
+          "title": "Intrinsic Dimensionality Explains the Effectiveness of Language Model Fine-Tuning",
+          "year": 2020,
+          "citations": 1023,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2305.14314",
+          "title": "QLoRA: Efficient Finetuning of Quantized LLMs",
+          "year": 2023,
+          "citations": 5895,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2402.09353",
+          "title": "DoRA: Weight-Decomposed Low-Rank Adaptation",
+          "year": 2024,
+          "citations": 1085,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2410.21228",
+          "title": "LoRA vs Full Fine-tuning: An Illusion of Equivalence",
+          "year": 2024,
+          "citations": 152,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "base_prime_editing",
+      "split": "development",
+      "kind": "cross_domain",
+      "prompt": "Find peer-reviewed research papers on CRISPR base editing and prime editing as alternatives to double-strand-break genome editing. Cover the original cytosine, adenine and prime editor designs, in vivo delivery approaches such as lipid nanoparticles and engineered virus-like particles, and recent clinical or therapeutic results. Distinguish preclinical animal evidence from human clinical evidence.",
+      "required_approaches": [
+        "cytosine and adenine base editors",
+        "prime editing",
+        "in vivo delivery",
+        "clinical translation"
+      ],
+      "anchors": [
+        {
+          "id": "DOI:10.1038/nature17946",
+          "title": "Programmable editing of a target base in genomic DNA without double-stranded DNA cleavage",
+          "year": 2016,
+          "citations": 4850,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/nature24644",
+          "title": "Programmable base editing of A•T to G•C in genomic DNA without DNA cleavage",
+          "year": 2017,
+          "citations": 5500,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/s41586-019-1711-4",
+          "title": "Search-and-replace genome editing without double-strand breaks or donor DNA",
+          "year": 2019,
+          "citations": 4106,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/s41586-021-03534-y",
+          "title": "In vivo CRISPR base editing of PCSK9 durably lowers cholesterol in primates",
+          "year": 2021,
+          "citations": 712,
+          "role": "core"
+        },
+        {
+          "id": "DOI:10.1016/j.cell.2021.12.021",
+          "title": "Engineered virus-like particles for efficient in vivo delivery of therapeutic proteins",
+          "year": 2022,
+          "citations": 569,
+          "role": "core"
+        },
+        {
+          "id": "DOI:10.1056/NEJMoa2504747",
+          "title": "Patient-Specific In Vivo Gene Editing to Treat a Rare Genetic Disease",
+          "year": 2025,
+          "citations": 255,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "speculative_decoding",
+      "split": "held_out",
+      "kind": "survey",
+      "prompt": "Find papers on accelerating autoregressive language-model decoding with speculative methods. Cover draft-and-verify methods, multi-head draft alternatives, tree-based verification and acceptance or correctness constraints. Distinguish exact distribution-preserving methods from approximate acceleration. Include supported citation relationships.",
+      "required_approaches": [
+        "draft and verify",
+        "multi-head drafts",
+        "tree verification",
+        "correctness or acceptance"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:2211.17192",
+          "title": "Fast Inference from Transformers via Speculative Decoding",
+          "year": 2022,
+          "citations": 2152,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2302.01318",
+          "title": "Accelerating Large Language Model Decoding with Speculative Sampling",
+          "year": 2023,
+          "citations": 1163,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2401.10774",
+          "title": "Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads",
+          "year": 2024,
+          "citations": 982,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2305.09781",
+          "title": "SpecInfer: Accelerating Generative Large Language Model Serving with Tree-based Speculative Inference and Verification",
+          "year": 2023,
+          "citations": 485,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2503.01840",
+          "title": "EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test",
+          "year": 2025,
+          "citations": 353,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "weight_quantization",
+      "split": "held_out",
+      "kind": "survey",
+      "prompt": "Find papers on post-training low-bit weight quantization of large language models. Cover second-order reconstruction, activation-aware scaling, outlier handling and a competing codebook approach. Distinguish weight-only from weight-and-activation quantization and report limitations supported by sources.",
+      "required_approaches": [
+        "second-order reconstruction",
+        "activation-aware scaling",
+        "outlier handling",
+        "codebook quantization"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:2210.17323",
+          "title": "GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers",
+          "year": 2022,
+          "citations": 2701,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2208.07339",
+          "title": "LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale",
+          "year": 2022,
+          "citations": 1317,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2306.00978",
+          "title": "AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration",
+          "year": 2023,
+          "citations": 1897,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2402.04396",
+          "title": "QuIP#: Even Better LLM Quantization with Hadamard Incoherence and Lattice Codebooks",
+          "year": 2024,
+          "citations": 444,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2410.09426",
+          "title": "FlatQuant: Flatness Matters for LLM Quantization",
+          "year": 2024,
+          "citations": 139,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "learned_retrieval",
+      "split": "held_out",
+      "kind": "survey",
+      "prompt": "Find papers on efficient learned text retrieval. Cover late-interaction retrieval, learned sparse retrieval, representation compression and retrieval evaluation. Keep first-stage retrieval distinct from cross-encoder reranking. Include supported citation relationships between foundational and follow-up methods.",
+      "required_approaches": [
+        "late interaction",
+        "learned sparse retrieval",
+        "representation compression",
+        "retrieval evaluation"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:2004.12832",
+          "title": "ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT",
+          "year": 2020,
+          "citations": 2614,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2104.08663",
+          "title": "BEIR: A Heterogenous Benchmark for Zero-shot Evaluation of Information Retrieval Models",
+          "year": 2021,
+          "citations": 2113,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2112.01488",
+          "title": "ColBERTv2: Effective and Efficient Retrieval via Lightweight Late Interaction",
+          "year": 2021,
+          "citations": 896,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2107.05720",
+          "title": "SPLADE: Sparse Lexical and Expansion Model for First Stage Ranking",
+          "year": 2021,
+          "citations": 702,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2502.13595",
+          "title": "MMTEB: Massive Multilingual Text Embedding Benchmark",
+          "year": 2025,
+          "citations": 191,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "table_structure",
+      "split": "held_out",
+      "kind": "survey",
+      "prompt": "Find papers on recovering table structure from document images. Cover transformer-based structure recognition, detection and structure datasets, and an alternative representation or model. Distinguish table detection, cell structure and OCR text recognition. Explain dataset or evaluation limitations using source evidence.",
+      "required_approaches": [
+        "structure recognition",
+        "table datasets",
+        "alternative model or representation",
+        "detection versus OCR"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:1911.10683",
+          "title": "Image-based table recognition: data, model, and evaluation",
+          "year": 2019,
+          "citations": 394,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2110.00061",
+          "title": "PubTables-1M: Towards comprehensive table extraction from unstructured documents",
+          "year": 2021,
+          "citations": 226,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2203.01017",
+          "title": "TableFormer: Table Structure Understanding with Transformers",
+          "year": 2022,
+          "citations": 161,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2305.03393",
+          "title": "Optimized Table Tokenization for Table Structure Recognition",
+          "year": 2023,
+          "citations": 43,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2412.07626",
+          "title": "OmniDocBench: Benchmarking Diverse PDF Document Parsing with Comprehensive Annotations",
+          "year": 2024,
+          "citations": 178,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "group_policy_optimization",
+      "split": "held_out",
+      "kind": "survey",
+      "prompt": "Find papers on group-relative reinforcement learning for language-model reasoning. Cover the original group-relative objective and later approaches addressing length bias, reward or normalization issues, and stability. Distinguish objective changes from training-system changes and avoid comparing incompatible evaluation setups.",
+      "required_approaches": [
+        "original objective",
+        "length bias",
+        "normalization or reward",
+        "stability"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:2402.03300",
+          "title": "DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models",
+          "year": 2024,
+          "citations": 9658,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2501.12948",
+          "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+          "year": 2025,
+          "citations": 5833,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2503.14476",
+          "title": "DAPO: An Open-Source LLM Reinforcement Learning System at Scale",
+          "year": 2025,
+          "citations": 2835,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2503.20783",
+          "title": "Understanding R1-Zero-Like Training: A Critical Perspective",
+          "year": 2025,
+          "citations": 1434,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2507.18071",
+          "title": "Group Sequence Policy Optimization",
+          "year": 2025,
+          "citations": 733,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "battery_cycle_life",
+      "split": "held_out",
+      "kind": "cross_domain",
+      "prompt": "Find research papers on data-driven battery cycle-life prediction and optimized fast charging. Cover early-life prediction, degradation features, closed-loop experiment design and generalization limits across operating conditions. Keep this a battery research review, not an analogy to machine-learning training.",
+      "required_approaches": [
+        "early-life prediction",
+        "degradation features",
+        "closed-loop charging",
+        "generalization limitations"
+      ],
+      "anchors": [
+        {
+          "id": "DOI:10.1038/s41560-019-0356-8",
+          "title": "Data-driven prediction of battery cycle life before capacity degradation",
+          "year": 2019,
+          "citations": 2842,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/s41586-020-1994-5",
+          "title": "Closed-loop optimization of fast-charging protocols for batteries with machine learning",
+          "year": 2020,
+          "citations": 1036,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/s42256-021-00312-3",
+          "title": "Machine learning pipeline for battery state-of-health estimation",
+          "year": 2021,
+          "citations": 602,
+          "role": "core"
+        },
+        {
+          "id": "DOI:10.1038/s41560-024-01675-8",
+          "title": "Dynamic cycling enhances battery lifetime",
+          "year": 2024,
+          "citations": 153,
+          "role": "recent"
+        },
+        {
+          "id": "DOI:10.1038/s42256-024-00972-x",
+          "title": "Battery lifetime prediction across diverse ageing conditions with inter-cell deep learning",
+          "year": 2025,
+          "citations": 137,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "state_space_frontier",
+      "split": "held_out",
+      "kind": "frontier",
+      "prompt": "What is new in linear-time sequence modeling for language over the last 18 months? Survey selective state-space models, gated linear-attention and delta-rule recurrences, and the hybrid architectures that interleave them with full attention in production-scale models released in 2025-26. Explain which design changes improved recall, state tracking or inference cost, and separate peer-reviewed results from technical reports.",
+      "required_approaches": [
+        "selective state-space foundations",
+        "state space duality or delta-rule recurrences",
+        "hybrid attention architectures",
+        "recent 2025-26 models"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:2312.00752",
+          "title": "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
+          "year": 2023,
+          "citations": 9412,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2405.21060",
+          "title": "Transformers are SSMs: Generalized Models and Efficient Algorithms Through Structured State Space Duality",
+          "year": 2024,
+          "citations": 2023,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2412.06464",
+          "title": "Gated Delta Networks: Improving Mamba2 with Delta Rule",
+          "year": 2024,
+          "citations": 550,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2504.03624",
+          "title": "Nemotron-H: A Family of Accurate and Efficient Hybrid Mamba-Transformer Models",
+          "year": 2025,
+          "citations": 93,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2510.26692",
+          "title": "Kimi Linear: An Expressive, Efficient Attention Architecture",
+          "year": 2025,
+          "citations": 190,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2603.15569",
+          "title": "Mamba-3: Improved Sequence Modeling using State Space Principles",
+          "year": 2026,
+          "citations": 102,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "ml_weather_frontier",
+      "split": "held_out",
+      "kind": "frontier",
+      "prompt": "What has changed in machine-learning global weather forecasting over the last 18 months? Cover the deterministic graph and transformer models that first rivaled physics-based numerical prediction, the shift to probabilistic ensemble forecasting with diffusion or CRPS-trained models, and large pretrained atmospheric models fine-tuned for other Earth-system tasks. Distinguish operational deployments from research results and report how models were evaluated against ECMWF baselines.",
+      "required_approaches": [
+        "deterministic ML forecasting",
+        "probabilistic ensemble forecasting",
+        "pretrained Earth-system models",
+        "evaluation against operational NWP"
+      ],
+      "anchors": [
+        {
+          "id": "DOI:10.1126/science.adi2336",
+          "title": "Learning skillful medium-range global weather forecasting",
+          "year": 2023,
+          "citations": 2024,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/s41586-023-06185-3",
+          "title": "Accurate medium-range global weather forecasting with 3D neural networks",
+          "year": 2023,
+          "citations": 2021,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/s41586-024-08252-9",
+          "title": "Probabilistic weather forecasting with machine learning",
+          "year": 2024,
+          "citations": 823,
+          "role": "recent"
+        },
+        {
+          "id": "DOI:10.1038/s41586-025-09005-y",
+          "title": "A foundation model for the Earth system",
+          "year": 2025,
+          "citations": 479,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2412.15832",
+          "title": "AIFS-CRPS: Ensemble forecasting using a model trained with a loss function based on the Continuous Ranked Probability Score",
+          "year": 2024,
+          "citations": 146,
+          "role": "recent"
+        },
+        {
+          "id": "ARXIV:2506.10772",
+          "title": "Skillful joint probabilistic weather forecasting from marginals",
+          "year": 2025,
+          "citations": 75,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "dpo_lineage",
+      "split": "held_out",
+      "kind": "lineage",
+      "prompt": "Starting from the paper \"Direct Preference Optimization: Your Language Model is Secretly a Reward Model\", map its research lineage. Identify the reinforcement learning from human feedback and PPO-based reward-model work it reformulates, then the main offline preference-optimization follow-ups that generalize the loss, remove the reference model or learn from unpaired feedback. Include recent open post-training recipes that apply these objectives at scale, with supported direct citation relationships.",
+      "required_approaches": [
+        "RLHF with PPO foundations",
+        "generalized preference losses",
+        "reference-free or unpaired objectives",
+        "recent large-scale post-training use"
+      ],
+      "anchors": [
+        {
+          "id": "ARXIV:2203.02155",
+          "title": "Training language models to follow instructions with human feedback",
+          "year": 2022,
+          "citations": 24752,
+          "role": "foundational"
+        },
+        {
+          "id": "ARXIV:2310.12036",
+          "title": "A General Theoretical Paradigm to Understand Learning from Human Preferences",
+          "year": 2023,
+          "citations": 1155,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2402.01306",
+          "title": "KTO: Model Alignment as Prospect Theoretic Optimization",
+          "year": 2024,
+          "citations": 187,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2405.14734",
+          "title": "SimPO: Simple Preference Optimization with a Reference-Free Reward",
+          "year": 2024,
+          "citations": 1206,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2403.07691",
+          "title": "ORPO: Monolithic Preference Optimization without Reference Model",
+          "year": 2024,
+          "citations": 714,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2411.15124",
+          "title": "Tulu 3: Pushing Frontiers in Open Language Model Post-Training",
+          "year": 2024,
+          "citations": 966,
+          "role": "recent"
+        }
+      ]
+    },
+    {
+      "name": "direct_air_capture_sorbents",
+      "split": "held_out",
+      "kind": "cross_domain",
+      "prompt": "Find research papers on solid sorbents for capturing CO2 directly from ambient air. Cover amine-appended and ultramicroporous metal-organic frameworks, newer porous framework sorbents, computational sorbent-screening datasets and process-level analyses of air-capture plants. Distinguish performance under dilute, humid air from flue-gas capture conditions.",
+      "required_approaches": [
+        "amine-functionalized MOFs",
+        "physisorbent or framework alternatives",
+        "computational screening",
+        "process and cost analysis"
+      ],
+      "anchors": [
+        {
+          "id": "DOI:10.1038/nature14327",
+          "title": "Cooperative insertion of CO2 in diamine-appended metal-organic frameworks",
+          "year": 2015,
+          "citations": 1143,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1021/acs.chemrev.6b00173",
+          "title": "Direct Capture of CO2 from Ambient Air",
+          "year": 2016,
+          "citations": 2020,
+          "role": "foundational"
+        },
+        {
+          "id": "DOI:10.1038/ncomms5228",
+          "title": "Made-to-order metal-organic frameworks for trace carbon dioxide removal and air capture",
+          "year": 2014,
+          "citations": 628,
+          "role": "core"
+        },
+        {
+          "id": "DOI:10.1016/j.joule.2018.05.006",
+          "title": "A Process for Capturing CO2 from the Atmosphere",
+          "year": 2018,
+          "citations": 1655,
+          "role": "core"
+        },
+        {
+          "id": "ARXIV:2311.00341",
+          "title": "The Open DAC 2023 Dataset and Challenges for Sorbent Discovery in Direct Air Capture",
+          "year": 2023,
+          "citations": 109,
+          "role": "core"
+        },
+        {
+          "id": "DOI:10.1038/s41586-024-08080-x",
+          "title": "Carbon dioxide capture from open air using covalent organic frameworks",
+          "year": 2024,
+          "citations": 349,
+          "role": "recent"
+        }
+      ]
+    }
+  ]
+}

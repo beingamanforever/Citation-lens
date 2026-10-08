@@ -1,12 +1,15 @@
-"""Run and page a bounded search in code; print only selected cards and coverage."""
+"""Search and expand outside the model context; print only the cards you keep.
+
+    python scripts/search.py "FlashAttention" "ring attention" --expand 3 --show 15
+
+Runs research_search, optionally expands the top N results as seeds, and prints compact JSON.
+"""
 
 import argparse
 import asyncio
 import json
 import os
 import sys
-import time
-from datetime import UTC, datetime
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
@@ -15,67 +18,38 @@ from mcp.client.stdio import stdio_client
 ROOT = Path(__file__).resolve().parents[1]
 
 
-async def search(arguments):
-    started = time.perf_counter()
-    parameters = StdioServerParameters(
+async def main(args):
+    server = StdioServerParameters(
         command=sys.executable, args=[str(ROOT / "run.py")], env=dict(os.environ)
     )
-    async with (
-        stdio_client(parameters) as (reader, writer),
-        ClientSession(reader, writer) as session,
-    ):
+    async with stdio_client(server) as (reader, writer), ClientSession(reader, writer) as session:
         await session.initialize()
 
-        async def call(tool, parameters):
-            result = await session.call_tool(tool, parameters)
+        async def call(tool, arguments):
+            result = await session.call_tool(tool, arguments)
             if result.isError:
                 raise RuntimeError(result.content[0].text)
             return json.loads(result.content[0].text)
 
-        page = await call(
-            "research_search",
-            {
-                "query": arguments.query,
-                "provider": arguments.provider,
-                "limit": arguments.limit,
-            },
-        )
-        first, papers, calls = page, list(page["papers"]), 1
-        while page["next_offset"] is not None:
-            page = await call(
-                "research_graph",
-                {
-                    "graph_id": first["graph_id"],
-                    "offset": page["next_offset"],
-                },
+        found = await call("research_search", {"query": args.query, "limit": args.show})
+        output = {"search": found["papers"], "searches": found["searches"]}
+        if args.expand:
+            seeds = [card["id"] for card in found["papers"][: args.expand]]
+            graph = await call(
+                "research_expand",
+                {"seed_ids": seeds, "query": args.query[0], "limit": args.show},
             )
-            papers.extend(page["papers"])
-            calls += 1
-        return {
-            "recorded_at": datetime.now(UTC).isoformat(),
-            "elapsed_ms": round((time.perf_counter() - started) * 1000),
-            "timing_scope": "SDK startup, search and cached paging; excludes host inference.",
-            "tool_calls": calls,
-            "http_totals": page["http_totals"],
-            "graph_id": first["graph_id"],
-            "total_candidates": first["node_count"],
-            "searches": first["searches"],
-            "errors": first["errors"],
-            "papers": papers[: arguments.show],
-            "selection": "Existing relevance/recency/prominence order; screen before reading. "
-            "Remaining cards are retained in graph_id, not discarded.",
-        }
+            output |= {
+                "expanded": graph["papers"],
+                "edges": graph["edges"],
+                "errors": graph["errors"],
+            }
+        print(json.dumps(output, ensure_ascii=False, separators=(",", ":")))
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("query", nargs="+")
-    parser.add_argument(
-        "--provider",
-        nargs="+",
-        choices=["openalex", "semantic_scholar", "arxiv"],
-        default=["openalex"],
-    )
-    parser.add_argument("--limit", type=int, choices=range(1, 21), default=10)
-    parser.add_argument("--show", type=int, choices=range(1, 21), default=10)
-    print(json.dumps(asyncio.run(search(parser.parse_args())), separators=(",", ":")))
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("query", nargs="+", help="1-4 query variants")
+    parser.add_argument("--expand", type=int, default=0, help="expand the top N search results")
+    parser.add_argument("--show", type=int, default=15)
+    asyncio.run(main(parser.parse_args()))

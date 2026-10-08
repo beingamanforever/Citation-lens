@@ -1,11 +1,16 @@
-# Citation Lens
+# Citation Lens 0.2.0
 
-Search papers, follow citations, and read text and figures in Codex and Claude Code.
+Connected-Papers-style citation expansion (foundation, follow-up and recent lanes ranked by
+coupling, co-citation and relevance), Semantic Scholar recommendations, batched provider calls,
+compact cards with verbatim snippets, and a new paired evaluation against native Codex.
 
-This release simplifies the README and package descriptions and uses `citation-lens` for both the plugin marketplace and Python package.
-The About section explains how concurrent searches, deduplication, caching and selective reading keep requests and context small.
+The corrected Codex evaluation records 17 Lens wins, one web win and two ties.
+It finds more relevant papers and verified links, with higher time and observed token use.
+The Claude comparison is running; its outcome is not claimed yet.
 
-[Installation and usage](https://github.com/beingamanforever/Citation-lens#install).
-[Exact results, failures and reproduction](https://github.com/beingamanforever/Citation-lens/blob/main/docs/BENCHMARKS.md).
+Restart the host after updating: the five tool names remain, with a revised interface.
+Search accepts query/provider lists, expansion walks one hop and can be re-seeded, and reading selects `abstract`, `outline` or `text` with optional batches.
+Graph pages report omitted edges when a dense page exceeds the edge budget.
 
-Assets include the plugin ZIP, Python wheel and source package, benchmark results and checksums.
+[Install and use](https://github.com/beingamanforever/Citation-lens#install) ·
+[Evaluation](https://github.com/beingamanforever/Citation-lens/blob/main/docs/EVALUATION.md)

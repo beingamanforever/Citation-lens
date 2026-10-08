@@ -1,4 +1,8 @@
-"""Bounded snowballing with explicit coverage and lossless graph paging."""
+"""Ranked discovery: fused search snapshots and Connected-Papers-style citation graphs.
+
+Every snapshot is stored once and paged as compact cards. A card is a preview: ID, title, year,
+citations, why it was selected, and one verbatim abstract sentence chosen for the query.
+"""
 
 import asyncio
 import json
@@ -6,9 +10,20 @@ import math
 import re
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
-from .papers import Papers, aliases
+from .papers import Papers, merge, s2_ref
+
+RECENT_DAYS = 730
+# One slow or throttled provider must not hold a whole call.
+SEARCH_SECONDS, LOOKUP_SECONDS, BATCH_SECONDS = 15, 30, 15
+SIMILAR_SEEDS = 4
+EDGES_PER_PAGE = 120
+MAX_CARDS = 60
+STOP = set(
+    "a an and are as at be by for from in into is it of on or our over the their this to under "
+    "using via we with without what which how new based towards toward".split()
+)
 
 
 def bounded(value: int, low: int, high: int, name: str):
@@ -16,7 +31,7 @@ def bounded(value: int, low: int, high: int, name: str):
         raise ValueError(f"{name} must be an integer from {low} to {high}")
 
 
-def payload(value: dict):
+def payload(value: dict) -> dict:
     value["payload_bytes"] = 0
     while True:
         size = len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode())
@@ -25,370 +40,440 @@ def payload(value: dict):
         value["payload_bytes"] = size
 
 
-def card(p: dict):
-    result = {
-        k: (p[k][:512] if isinstance(p.get(k), str) else p.get(k))
-        for k in (
-            "id",
-            "title",
-            "year",
-            "citations",
-            "citation_status",
-            "provider",
-            "url",
-            "doi",
-            "arxiv",
-        )
-    } | {
-        "abstract_excerpt": p.get("abstract", "")[:650],
-        "excerpt_truncated": len(p.get("abstract", "")) > 650,
-        "full_text_available": bool(p.get("pdf") or p.get("arxiv")),
+def describe(error: BaseException) -> str:
+    return (str(error) or type(error).__name__)[:160]
+
+
+def stems(text: str) -> set[str]:
+    # ponytail: six-letter prefixes stand in for stemming; add a real stemmer if recall suffers.
+    return {
+        w[:6] for w in re.findall(r"[a-z0-9]+", text.casefold()) if w not in STOP and len(w) > 1
     }
-    if "search_matches" in p:
-        result["search_matches"] = p["search_matches"]
+
+
+def text_score(paper: dict, queries: list[set[str]]) -> float:
+    """1.0 when every query term is in the title; 0.5 when they are only in the abstract."""
+    title, abstract = stems(paper["title"]), stems(paper["abstract"])
+    return max(
+        ((len(q & title) + len(q & (title | abstract))) / (2 * len(q)) for q in queries if q),
+        default=0.0,
+    )
+
+
+def snippet(abstract: str, terms: set[str], limit: int = 220) -> str:
+    """The abstract sentence sharing most query terms, verbatim, cut at a word boundary."""
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", abstract.strip()) if s]
+    if not sentences:
+        return ""
+    best = max(enumerate(sentences), key=lambda item: (len(stems(item[1]) & terms), -item[0]))[1]
+    return best if len(best) <= limit else best[:limit].rsplit(" ", 1)[0]
+
+
+def percentile(values: list[float]) -> list[float]:
+    ordered = sorted(values)
+    top = max(1, len(ordered) - 1)
+    position = {}
+    for index, value in enumerate(ordered):
+        position.setdefault(value, index)  # Ties share the lowest rank, so zeros stay at zero.
+    return [position[value] / top for value in values]
+
+
+def window_start(today: date | None = None) -> str:
+    return ((today or date.today()) - timedelta(days=RECENT_DAYS)).isoformat()
+
+
+def is_recent(paper: dict, since: str) -> bool:
+    if paper["date"]:
+        return paper["date"] >= since
+    return (paper["year"] or 0) > int(since[:4])
+
+
+def card(paper: dict, terms: set[str], why: str = "", lane: str = "") -> dict:
+    result = {
+        "id": paper["id"],
+        "title": paper["title"][:300],
+        "year": paper["year"],
+        "cites": paper["citations"],
+        "url": paper["url"],
+    }
+    if lane:
+        result["lane"] = lane
+    if why:
+        result["why"] = why
+    if text := snippet(paper["abstract"], terms):
+        result["snippet"] = text
     return result
 
 
-def relevance(p: dict, query: str):
-    terms = set(re.findall(r"\w+", query.lower()))
-    words = set(re.findall(r"\w+", (p["title"] + " " + p.get("abstract", "")).lower()))
-    overlap = len(terms & words) / max(1, len(terms))
-    return overlap + 0.03 * math.log1p(p.get("citations", 0))
+def interleave(lanes: list[list[str]]) -> dict[str, int]:
+    """Round-robin the ranked lanes; each ID keeps its first position and the lane it came from."""
+    placed: dict[str, int] = {}
+    for row in range(max(map(len, lanes), default=0)):
+        for lane, members in enumerate(lanes):
+            if row < len(members):
+                placed.setdefault(members[row], lane)
+    return placed
 
 
-def balanced(papers: list[dict], query: str, limit: int):
-    """Round-robin topical relevance, recency and prominence; stable tie-breaks."""
-    relevant = sorted(papers, key=lambda p: (-relevance(p, query), p["id"]))
-    recent = sorted(papers, key=lambda p: (-(p.get("year") or 0), -relevance(p, query), p["id"]))
-    prominent = sorted(
-        papers, key=lambda p: (-p.get("citations", 0), -relevance(p, query), p["id"])
-    )
-    selected, seen = [], set()
-    for row in zip(relevant, recent, prominent, strict=True):
-        for p in row:
-            if p["id"] not in seen:
-                selected.append(p)
-                seen.add(p["id"])
-                if len(selected) == limit:
-                    return selected
-    return selected
+def ranked(items: list[dict], weights: dict[str, float]) -> list[str]:
+    return [
+        i["id"] for i in sorted(items, key=lambda i: -sum(w * i[f] for f, w in weights.items()))
+    ]
 
 
 class Graphs:
     def __init__(self, papers: Papers):
         self.papers = papers
         self.store = papers.store
-        self.locks: dict[str, asyncio.Lock] = {}
 
-    def view(self, graph_id: str, offset=0, limit=10, edge_offset=0):
-        bounded(offset, 0, 200, "offset")
-        bounded(limit, 1, 20, "limit")
-        bounded(edge_offset, 0, 20000, "edge_offset")
+    def view(self, graph_id: str, offset: int = 0, limit: int = 20) -> dict:
+        """One page of cards plus the citation edges that this page completes."""
+        bounded(offset, 0, 10_000, "offset")
+        limit = max(1, min(limit, MAX_CARDS))  # Clamp rather than fail: a retry costs a turn.
         graph = self.store.load("graph:" + graph_id)
         if graph is None:
             raise ValueError("Unknown or expired graph_id")
-        ordered = balanced(list(graph["nodes"].values()), graph["query"], 200)
-        edges = graph["edges"][edge_offset : edge_offset + 50]
+        order, nodes = graph["order"], graph["nodes"]
+        rank = {pid: -1 for pid in graph["seeds"]} | {pid: i for i, pid in enumerate(order)}
+        terms = set().union(*map(set, graph["terms"]))
         result = {
             "graph_id": graph_id,
-            "query": graph["query"],
-            "created_at": graph["created_at"],
-            "node_count": len(ordered),
-            "edge_count": len(graph["edges"]),
-            "papers": [card(p) for p in ordered[offset : offset + limit]],
-            "next_offset": offset + limit if offset + limit < len(ordered) else None,
-            "edges": edges,
-            "next_edge_offset": edge_offset + 50
-            if edge_offset + 50 < len(graph["edges"])
-            else None,
-            "coverage": graph["coverage"][-12:],
-            "errors": graph["errors"][-12:],
-            "coverage_entries": len(graph["coverage"]),
-            "error_count": len(graph["errors"]),
-            "stops": graph["stops"],
-            "selection": "relevance/recency/prominence heuristic, not SOTA",
+            "total": len(order),
+            "offset": offset,
+            "papers": [
+                card(nodes[pid], terms, *graph["notes"].get(pid, ("", "")))
+                for pid in order[offset : offset + limit]
+            ],
+            "next_offset": offset + limit if offset + limit < len(order) else None,
         }
         if "searches" in graph:
             result["searches"] = graph["searches"]
-        return payload(result)
-
-    async def search(self, query, provider, limit, recent=False, year_from=None):
-        queries = [query] if isinstance(query, str) else query
-        providers = [provider] if isinstance(provider, str) else provider
-        if (
-            not isinstance(queries, list)
-            or not 1 <= len(queries) <= 3
-            or any(
-                not isinstance(value, str) or not value.strip() or len(value) > 500
-                for value in queries
+        if "coverage" in graph:
+            result["seeds"] = graph["coverage"]
+        if "errors" in graph:
+            result["errors"] = graph["errors"]
+        if graph["seeds"]:
+            # Each edge appears once: on the page that shows its later-ranked endpoint;
+            # edges between seeds (rank -1) come with the first page.
+            edges = [
+                edge
+                for edge in graph["edges"]
+                if edge[0] in rank
+                and edge[1] in rank
+                and (offset or -1) <= max(rank[edge[0]], rank[edge[1]]) < offset + limit
+            ]
+            # Dense neighborhoods have hundreds of links; keep those touching seeds and the
+            # best-ranked cards so edges never dominate the context.
+            edges.sort(key=lambda edge: sorted((rank[edge[0]], rank[edge[1]])))
+            result["edges"] = edges[:EDGES_PER_PAGE]
+            if len(edges) > EDGES_PER_PAGE:
+                result["edges_omitted"] = len(edges) - EDGES_PER_PAGE
+            result["edge_note"] = (
+                "[citing, cited] from provider reference lists; to check one, open "
+                "https://api.semanticscholar.org/graph/v1/paper/<citing id>/references"
             )
-            or len(set(queries)) != len(queries)
-        ):
-            raise ValueError(
-                "query must be 1 to 3 distinct nonblank strings of at most 500 characters"
-            )
-        allowed_providers = {"openalex", "semantic_scholar", "arxiv"}
-        if (
-            not isinstance(providers, list)
-            or not 1 <= len(providers) <= 3
-            or any(value not in allowed_providers for value in providers)
-            or len(set(providers)) != len(providers)
-        ):
-            raise ValueError("provider must contain 1 to 3 distinct supported providers")
-        bounded(limit, 1, 20, "limit")
-        if not isinstance(recent, bool):
-            raise ValueError("recent must be a boolean")
-        if year_from is not None:
-            bounded(year_from, 1800, 2100, "year_from")
+        return result
 
-        jobs = [(term, source) for term in queries for source in providers]
+    def _save(self, graph: dict) -> str:
+        graph_id = uuid.uuid4().hex[:12]
+        graph["created_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+        graph["nodes"] = {
+            pid: {k: v for k, v in paper.items() if k != "refs"}
+            for pid, paper in graph["nodes"].items()
+        }
+        self.store.save("graph:" + graph_id, graph)
+        return graph_id
+
+    async def search(self, queries: list[str], providers: list[str], limit: int = 20) -> dict:
+        """Run every query on every provider concurrently, fuse their rankings, and reserve
+        every third card for work from the last two years."""
+        started, since = time.monotonic(), window_start()
+        jobs = [(q, p, False) for q in queries for p in providers if p != "arxiv"]
+        if "arxiv" in providers:
+            both = "\n".join(queries)
+            jobs += [(both, "arxiv", False), (both, "arxiv", True)]
         results = await asyncio.gather(
-            *[self.papers.search(term, source, limit, recent, year_from) for term, source in jobs],
+            *(
+                asyncio.wait_for(
+                    self.papers.search(q, p, 25, since if newest else None, newest),
+                    SEARCH_SECONDS,
+                )
+                for q, p, newest in jobs
+            ),
             return_exceptions=True,
         )
-        searches = []
-        components = []
+        records, positions, searches = [], [], []
         succeeded = 0
-        result_order = 0
-        for search_index, ((term, source), result) in enumerate(zip(jobs, results, strict=True)):
-            search = {
-                "query": term,
-                "provider": source,
-                "recent": recent,
-                "year_from": year_from,
-            }
+        for job, ((query, provider, newest), result) in enumerate(zip(jobs, results, strict=True)):
+            entry = {"query": query.replace("\n", " | "), "provider": provider}
+            if newest:
+                entry["newest_since"] = since
             if isinstance(result, Exception):
-                searches.append(
-                    search
-                    | {
-                        "returned": None,
-                        "total_indexed_matches": None,
-                        "sampled": None,
-                        "error": str(result)[:200],
-                    }
-                )
+                searches.append(entry | {"error": describe(result)})
                 continue
             succeeded += 1
             found, total = result
-            searches.append(
-                search
-                | {
-                    "returned": len(found),
-                    "total_indexed_matches": total,
-                    "sampled": total > len(found),
-                    "error": None,
-                }
-            )
-            for paper in found:
-                result_order += 1
-                paper_aliases = aliases(paper)
-                overlapping = [part for part in components if part["aliases"] & paper_aliases]
-                if not overlapping:
-                    components.append(
-                        {
-                            "paper": paper,
-                            "paper_order": result_order,
-                            "aliases": set(paper_aliases),
-                            "search_matches": {search_index},
-                        }
-                    )
-                    continue
-                representative = overlapping[0]
-                candidates = [(part["paper_order"], part["paper"]) for part in overlapping] + [
-                    (result_order, paper)
-                ]
-                readable = [
-                    candidate
-                    for candidate in candidates
-                    if candidate[1].get("arxiv") or candidate[1].get("pdf")
-                ]
-                selected_order, selected_paper = min(
-                    readable or candidates, key=lambda item: item[0]
-                )
-                representative["paper"] = selected_paper
-                representative["paper_order"] = selected_order
-                representative["aliases"].update(paper_aliases)
-                representative["search_matches"].add(search_index)
-                for duplicate in overlapping[1:]:
-                    representative["aliases"].update(duplicate["aliases"])
-                    representative["search_matches"].update(duplicate["search_matches"])
-                    components.remove(duplicate)
-
+            searches.append(entry | {"returned": len(found), "total": total})
+            records += found
+            positions += [(job, rank) for rank in range(len(found))]
         if not succeeded:
-            details = "; ".join(
-                f"{item['query']}/{item['provider']}: {item['error']}" for item in searches
-            )
-            raise RuntimeError(("All searches failed: " + details)[:500])
+            raise RuntimeError("Every search failed: " + json.dumps(searches))
 
-        nodes = {}
-        for component in components:
-            paper = dict(component["paper"])
-            paper["aliases"] = sorted(component["aliases"])
-            paper["search_matches"] = sorted(component["search_matches"])
-            nodes[paper["id"]] = paper
-        graph_id = uuid.uuid4().hex
-        self.store.save(
-            "graph:" + graph_id,
-            {
-                "query": queries[0],
-                "nodes": nodes,
+        terms = [stems(q) for q in queries]
+        if not records:
+            graph = {
+                "terms": [sorted(t) for t in terms],
+                "seeds": [],
                 "edges": [],
-                "coverage": [],
-                "errors": [
-                    {"query": item["query"], "provider": item["provider"], "error": item["error"]}
-                    for item in searches
-                    if item["error"] is not None
-                ],
-                "expanded": [],
-                "stops": [],
-                "created_at": datetime.now(UTC).isoformat(),
+                "order": [],
+                "notes": {},
+                "nodes": {},
                 "searches": searches,
-            },
-        )
-        return self.view(graph_id)
+            }
+            result = self.view(self._save(graph), 0, limit)
+            result["elapsed_ms"] = round((time.monotonic() - started) * 1000)
+            return result
+
+        papers, owners = merge(records)
+        best_rank: dict[str, dict[int, int]] = {}
+        for pid, (job, rank) in zip(owners, positions, strict=True):
+            ranks = best_rank.setdefault(pid, {})
+            ranks[job] = min(rank, ranks.get(job, rank))
+        # Reciprocal rank fusion: agreement across queries and providers raises a paper.
+        fused = {pid: sum(1 / (20 + r) for r in ranks.values()) for pid, ranks in best_rank.items()}
+        top = max(fused.values())
+        prominence = percentile([math.log1p(p["citations"] or 0) for p in papers])
+        items = [
+            {
+                "id": p["id"],
+                "fused": fused[p["id"]] / top,
+                "text": text_score(p, terms),
+                "prominence": prom,
+                "recent": is_recent(p, since),
+            }
+            for p, prom in zip(papers, prominence, strict=True)
+        ]
+        best = ranked(items, {"fused": 0.45, "text": 0.25, "prominence": 0.3})
+        recent = ranked([i for i in items if i["recent"]], {"fused": 0.5, "text": 0.5})
+        placed = interleave([best[0::2], best[1::2], recent])
+        order = list(placed)
+        notes = {
+            pid: (
+                f"matched {len(best_rank[pid])}/{len(jobs)} searches",
+                "recent" if lane == 2 else "",
+            )
+            for pid, lane in placed.items()
+        }
+        graph = {
+            "terms": [sorted(t) for t in terms],
+            "seeds": [],
+            "edges": [],
+            "order": order,
+            "notes": notes,
+            "nodes": {p["id"]: p for p in papers},
+            "searches": searches,
+        }
+        result = self.view(self._save(graph), 0, limit)
+        result["elapsed_ms"] = round((time.monotonic() - started) * 1000)
+        return result
 
     async def expand(
-        self,
-        seed_ids: list[str],
-        query: str,
-        graph_id: str | None = None,
-        depth=1,
-        beam=4,
-        max_nodes=80,
-        neighbors=20,
-        direction="both",
-    ):
-        if not 1 <= len(seed_ids) <= 8 or len(set(seed_ids)) != len(seed_ids):
-            raise ValueError("Provide 1 to 8 distinct seed_ids")
-        for value, lo, hi, name in (
-            (depth, 1, 3, "depth"),
-            (beam, 1, 8, "beam"),
-            (max_nodes, 1, 200, "max_nodes"),
-            (neighbors, 1, 40, "neighbors"),
-        ):
-            bounded(value, lo, hi, name)
-        if direction not in ("both", "forward", "backward"):
-            raise ValueError("direction must be forward, backward, or both")
-        if not query.strip() or len(query) > 500:
-            raise ValueError("query must contain 1 to 500 characters")
-        started = time.monotonic()
-        resuming = graph_id is not None
-        graph_id = graph_id or uuid.uuid4().hex
-        # ponytail: per-process locks; add revision checks for cross-process shared writes.
-        async with self.locks.setdefault(graph_id, asyncio.Lock()):
-            graph = self.store.load("graph:" + graph_id)
-            if resuming and graph is None:
-                raise ValueError("Unknown or expired graph_id")
-            if graph is None:
-                graph = {
-                    "query": query,
-                    "nodes": {},
-                    "edges": [],
-                    "coverage": [],
-                    "errors": [],
-                    "expanded": [],
-                    "stops": [],
-                    "created_at": datetime.now(UTC).isoformat(),
-                }
-            elif query != graph["query"]:
-                raise ValueError("A resumed graph must keep its original query")
-            if max_nodes < len(graph["nodes"]) or max_nodes < len(seed_ids):
-                raise ValueError("max_nodes cannot be smaller than the graph or seed count")
-            seeds = await asyncio.gather(
-                *[self.papers.resolve(s) for s in seed_ids], return_exceptions=True
+        self, seed_ids: list[str], query: str, direction: str = "both", limit: int = 20
+    ) -> dict:
+        """Snowball one hop from the seeds and rank neighbors like Connected Papers:
+        foundations are cited by many graph papers, follow-ups cite the seeds or share their
+        references, and recent work comes from the last two years. Query match keeps the graph
+        on topic; Semantic Scholar recommendations add similar papers a citation list misses."""
+        started, since = time.monotonic(), window_start()
+        seeds = await self.papers.resolve_many(seed_ids, BATCH_SECONDS)
+        if not seeds:
+            raise ValueError("None of the seed IDs could be resolved")
+        lookups = []
+        if direction in ("both", "forward"):
+            for index, seed in enumerate(seeds):
+                lookups.append((index, "citations", self.papers.citations(seed, since)))
+                if index < SIMILAR_SEEDS:  # Seeds come most central first; spare the API.
+                    lookups.append((index, "similar", self.papers.similar(seed)))
+        backward = direction in ("both", "backward")
+        results = await asyncio.gather(
+            *(asyncio.wait_for(call, LOOKUP_SECONDS) for *_, call in lookups),
+            asyncio.wait_for(self.papers.references(seeds if backward else []), LOOKUP_SECONDS),
+            return_exceptions=True,
+        )
+        # One batch serves every seed's references; split it back into per-seed lookups.
+        references = results.pop()
+        for index in range(len(seeds) if backward else 0):
+            lookups.append((index, "references", None))
+            results.append(
+                references if isinstance(references, BaseException) else references[index]
             )
-            alias_map = {a: p["id"] for p in graph["nodes"].values() for a in aliases(p)}
 
-            def add(p):
-                canonical = next(
-                    (alias_map[a] for a in sorted(aliases(p)) if a in alias_map), p["id"]
+        records, raw_edges, recommended, errors = list(seeds), [], [], []
+        for seed in seeds:
+            if not s2_ref(seed):
+                errors.append(
+                    {
+                        "seed": seed["id"],
+                        "error": "No arXiv, DOI or Semantic Scholar "
+                        "ID: references and citing papers come from OpenAlex only",
+                    }
                 )
-                if canonical not in graph["nodes"]:
-                    if len(graph["nodes"]) >= max_nodes:
-                        return None
-                    graph["nodes"][canonical] = dict(p)
-                elif p["id"] == canonical:
-                    existing = graph["nodes"][canonical]
-                    refreshed = dict(p)
-                    refreshed["aliases"] = sorted(aliases(existing) | aliases(p))
-                    if "search_matches" in existing or "search_matches" in p:
-                        refreshed["search_matches"] = sorted(
-                            set(existing.get("search_matches", []))
-                            | set(p.get("search_matches", []))
-                        )
-                    graph["nodes"][canonical] = refreshed
-                else:
-                    existing = graph["nodes"][canonical]
-                    existing["aliases"] = sorted(aliases(existing) | aliases(p))
-                alias_map.update(dict.fromkeys(aliases(graph["nodes"][canonical]), canonical))
-                return canonical
-
-            frontier = []
-            for seed, result in zip(seed_ids, seeds, strict=True):
-                if isinstance(result, Exception):
-                    graph["errors"].append({"seed": seed, "error": str(result)[:200]})
-                elif (pid := add(result)) and pid not in frontier:
-                    frontier.append(pid)
-            directions = ("backward", "forward") if direction == "both" else (direction,)
-            edge_keys = {(e["from"], e["to"]) for e in graph["edges"]}
-            for _hop in range(depth):
-                jobs = [
-                    (pid, d)
-                    for pid in frontier
-                    for d in directions
-                    if not any(e[:2] == [pid, d] and e[2] >= neighbors for e in graph["expanded"])
+        coverage = [{"cites": seed["citations"]} for seed in seeds]
+        if len(seeds) < len(seed_ids):
+            errors.append({"error": f"{len(seed_ids) - len(seeds)} seed ID(s) not resolved"})
+        for (index, kind, _), result in zip(lookups, results, strict=True):
+            if isinstance(result, BaseException):
+                errors.append(
+                    {"seed": seeds[index]["id"], "lookup": kind, "error": describe(result)}
+                )
+                continue
+            if kind == "citations":
+                result, failures = result
+                errors += [
+                    {"seed": seeds[index]["id"], "lookup": kind, "error": e} for e in failures
                 ]
-                if not jobs:
-                    graph["stops"].append("frontier exhausted or already expanded")
-                    break
-                results = await asyncio.gather(
-                    *[self.papers.neighbors(graph["nodes"][pid], d, neighbors) for pid, d in jobs],
-                    return_exceptions=True,
-                )
-                discovered = []
-                for (pid, d), result in zip(jobs, results, strict=True):
-                    if isinstance(result, Exception):
-                        graph["errors"].append(
-                            {"seed": pid, "direction": d, "error": str(result)[:200]}
-                        )
-                        continue
-                    candidates, coverage = result
-                    selected = balanced(candidates, query, neighbors)
-                    retained = 0
-                    for p in selected:
-                        if (other := add(p)) is None:
-                            continue
-                        retained += 1
-                        discovered.append(graph["nodes"][other])
-                        source, target = (pid, other) if d == "backward" else (other, pid)
-                        if source != target and (source, target) not in edge_keys:
-                            edge_keys.add((source, target))
-                            graph["edges"].append(
-                                {
-                                    "from": source,
-                                    "to": target,
-                                    "provider": p["provider"],
-                                    "evidence": p.get("edge_evidence"),
-                                }
-                            )
-                    graph["coverage"].append(
-                        {
-                            "seed": pid,
-                            "direction": d,
-                            **coverage,
-                            "selected": len(selected),
-                            "retained": retained,
-                        }
-                    )
-                    # A capped expansion can be retried after increasing max_nodes.
-                    if retained == len(selected):
-                        graph["expanded"].append([pid, d, neighbors])
-                if len(graph["nodes"]) >= max_nodes:
-                    graph["stops"].append("max_nodes reached")
-                    break
-                frontier = [p["id"] for p in balanced(discovered, query, beam)]
-            graph["stops"] = list(dict.fromkeys(graph["stops"]))
-            self.store.save("graph:" + graph_id, graph)
-        view = self.view(graph_id)
-        view["elapsed_ms"] = round((time.monotonic() - started) * 1000)
-        return payload(view)
+            coverage[index][kind] = len(result)
+            for rank, paper in enumerate(result):
+                if kind == "similar":
+                    recommended.append((len(records), rank))
+                else:
+                    pair = (index, len(records))
+                    raw_edges.append(pair if kind == "references" else pair[::-1])
+                records.append(paper)
+
+        papers, owners = merge(records)
+        nodes = {p["id"]: p for p in papers}
+        seed_set = list(dict.fromkeys(owners[: len(seeds)]))
+        edges = {(owners[a], owners[b]) for a, b in raw_edges if owners[a] != owners[b]}
+        pool = [p for p in papers if p["id"] not in seed_set]
+        if not pool:
+            raise RuntimeError("No citation neighbors found: " + json.dumps(errors))
+        similar = {p["id"]: 0.0 for p in pool}
+        similar_seeds = {p["id"]: 0 for p in pool}
+        for record, rank in recommended:
+            if (pid := owners[record]) in similar:
+                similar[pid] += 1 - rank / 100
+                similar_seeds[pid] += 1
+
+        def direct(pid):
+            return sum((pid, s) in edges or (s, pid) in edges for s in seed_set)
+
+        # Reference lists of the likeliest candidates reveal coupling, co-citation and the
+        # edges between candidates. One batch request covers them.
+        terms = [stems(query)]
+        shortlist = sorted(
+            pool, key=lambda p: -(direct(p["id"]) + 2 * text_score(p, terms) + similar[p["id"]])
+        )
+        try:
+            hydrated = self.papers.with_references(shortlist[:400])
+            for paper in await asyncio.wait_for(hydrated, BATCH_SECONDS):
+                nodes[paper["id"]]["refs"] = paper["refs"]
+        except (RuntimeError, ValueError, TimeoutError) as error:
+            errors.append({"lookup": "candidate references", "error": describe(error)})
+        owner = {}
+        for record, pid in zip(records, owners, strict=True):
+            for name in ("s2", "oa"):
+                if record[name]:
+                    owner.setdefault(f"{name}:{record[name]}", pid)
+        for paper in nodes.values():
+            for ref in paper["refs"]:
+                if (target := owner.get(ref)) and target != paper["id"]:
+                    edges.add((paper["id"], target))
+
+        cited_by = {pid: set() for pid in nodes}
+        references = {pid: set() for pid in nodes}
+        for a, b in edges:
+            cited_by[b].add(a)
+            references[a].add(b)
+        seed_members = set(seed_set)
+        seed_refs = set().union(*(references[s] for s in seed_set)) - seed_members
+        seed_citers = set().union(*(cited_by[s] for s in seed_set))
+        # A citation counts by how on-topic the citing paper is: seeds count fully, while
+        # generic papers citing a popular tool add little (an application of FlashAttention
+        # does not make vLLM a foundation of exact attention).
+        relevance = {
+            pid: 1.0 if pid in seed_members else text_score(nodes[pid], terms) for pid in nodes
+        }
+        this_year = date.today().year
+        items = []
+        for paper in pool:
+            pid = paper["id"]
+            weighted_citers = sum(relevance[c] for c in cited_by[pid])
+            shared = references[pid] & seed_refs
+            # Bibliographic coupling (Adamic/Adar weighted, Salton normalized) and co-citation.
+            coupling = sum(1 / math.log(2 + (nodes[r]["citations"] or 0)) for r in shared)
+            coupling /= math.sqrt(max(1, len(paper["refs"]) or len(references[pid])))
+            age = max(1, this_year - (paper["year"] or this_year) + 1)
+            items.append(
+                {
+                    "id": pid,
+                    "direct": direct(pid) / len(seed_set),
+                    "coupling": coupling,
+                    "cocited": sum(relevance[c] for c in cited_by[pid] & seed_citers),
+                    "indegree": weighted_citers,
+                    "cited_by_relevant": weighted_citers,
+                    "similar": similar[pid],
+                    "text": text_score(paper, terms),
+                    "total": math.log1p(paper["citations"] or 0),
+                    "velocity": math.log1p((paper["citations"] or 0) / age),
+                    "recent": is_recent(paper, since),
+                }
+            )
+        for field in ("coupling", "cocited", "indegree", "similar", "total", "velocity"):
+            for item, value in zip(items, percentile([i[field] for i in items]), strict=True):
+                item[field] = value
+        # Keep a neighbor that matches the query, resembles a seed, or is cited by several
+        # relevant papers (two seeds suffice); drop papers that merely use a seed as a tool and
+        # the off-topic entries of a single bibliography.
+        kept = [
+            i
+            for i in items
+            if i["text"] >= 0.15 or similar_seeds[i["id"]] or i["cited_by_relevant"] >= 1.5
+        ]
+        older = [i for i in kept if not i["recent"]]
+        # Foundations are cited by a seed or by several relevant graph papers (Connected Papers'
+        # prior works); follow-ups cite or resemble the seeds (derivative works).
+        foundations = ranked(
+            [i for i in older if cited_by[i["id"]] & seed_members or i["cited_by_relevant"] >= 1.5],
+            {"indegree": 0.45, "cocited": 0.15, "text": 0.2, "total": 0.2},
+        )
+        follow_ups = ranked(
+            [i for i in older if references[i["id"]] or similar_seeds[i["id"]]],
+            {"coupling": 0.3, "direct": 0.2, "similar": 0.15, "text": 0.2, "velocity": 0.15},
+        )
+        recent = ranked(
+            [i for i in kept if i["recent"]],
+            {"coupling": 0.25, "direct": 0.15, "similar": 0.15, "text": 0.3, "velocity": 0.15},
+        )
+        placed = interleave([foundations, follow_ups, recent])
+        lane_names = ("foundation", "follow-up", "recent")
+        notes = {}
+        for pid, lane in placed.items():
+            parts = []
+            if hits := sum((s, pid) in edges for s in seed_set):
+                parts.append(f"cited by {hits}/{len(seed_set)} seeds")
+            if hits := sum((pid, s) in edges for s in seed_set):
+                parts.append(f"cites {hits}/{len(seed_set)} seeds")
+            if hits := similar_seeds[pid]:
+                parts.append(f"similar to {hits}/{len(seed_set)} seeds")
+            if shared := len(references[pid] & seed_refs):
+                parts.append(f"shares {shared} seed refs")
+            if others := len(cited_by[pid] - seed_members):
+                parts.append(f"cited by {others} graph papers")
+            notes[pid] = ("; ".join(parts), lane_names[lane])
+        seed_coverage = [
+            {"id": pid} | item for pid, item in zip(owners[: len(seeds)], coverage, strict=True)
+        ]
+        graph = {
+            "terms": [sorted(t) for t in terms],
+            "seeds": seed_set,
+            "order": list(placed),
+            "notes": notes,
+            "nodes": nodes,
+            "edges": sorted(edges),
+            "coverage": seed_coverage,
+            "errors": errors,
+        }
+        result = self.view(self._save(graph), 0, limit)
+        result["elapsed_ms"] = round((time.monotonic() - started) * 1000)
+        return result

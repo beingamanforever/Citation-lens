@@ -29,9 +29,12 @@ def checked_url(url: str):
 
 async def public_url(url: str):
     parts = checked_url(url)
-    addresses = await asyncio.get_running_loop().getaddrinfo(
-        parts.hostname, 443, type=socket.SOCK_STREAM
-    )
+    try:
+        addresses = await asyncio.get_running_loop().getaddrinfo(
+            parts.hostname, 443, type=socket.SOCK_STREAM
+        )
+    except OSError:
+        raise RuntimeError(f"{parts.hostname}: DNS lookup failed") from None
     if not addresses or any(not ipaddress.ip_address(a[4][0]).is_global for a in addresses):
         raise ValueError("Private, loopback, and reserved network addresses are blocked")
     return addresses[0][4][0]
@@ -49,6 +52,12 @@ class Web:
         self.pending: dict[str, asyncio.Task] = {}
         self.requests = 0
         self.hits = 0
+        # Interactive defaults: give up quickly. Batch jobs such as grading can be patient.
+        self.attempts, self.max_wait = 5, 8.0
+        # A host that stays throttled through every retry is skipped for a minute, so one
+        # saturated provider fails fast instead of costing every later call its retries.
+        self.cooldown = 60.0
+        self.down_until: dict[str, float] = {}
 
     async def fetch(self, url: str, *, body=None, ttl=86400, max_bytes=20_000_000) -> bytes:
         checked_url(url)
@@ -85,69 +94,79 @@ class Web:
             env, header, prefix = secrets[original_host]
             if value := os.getenv(env):
                 headers[header] = prefix + value
-        async with asyncio.timeout(45), self.slots:
+        async with asyncio.timeout(60 * self.attempts / 3):
             for _redirect in range(6):
                 host = urlsplit(url).hostname
-                for attempt in range(3):
+                if (wait := self.down_until.get(host, 0) - time.monotonic()) > 0:
+                    raise RuntimeError(f"{host}: throttled; skipped for {wait:.0f}s")
+                for attempt in range(self.attempts):
                     # S2 keys commonly begin at 1 request/s. arXiv asks for 3s pacing.
-                    interval = (
-                        1.05
-                        if host == "api.semanticscholar.org"
-                        else 3.05
-                        if host in ("arxiv.org", "export.arxiv.org")
-                        else 0.15
+                    interval = {"api.semanticscholar.org": 1.05, "export.arxiv.org": 3.05}.get(
+                        host, 0.15
                     )
                     async with self.locks.setdefault(host, asyncio.Lock()):
                         await asyncio.sleep(max(0, self.next_at.get(host, 0) - time.monotonic()))
                         self.next_at[host] = time.monotonic() + interval
                     self.requests += 1
+                    request_url, request_headers, extensions = url, dict(headers), {}
+                    if host not in ("api.openalex.org", "api.semanticscholar.org", "r.jina.ai"):
+                        address = await public_url(url)
+                        parts = urlsplit(url)
+                        authority = f"[{address}]" if ":" in address else address
+                        request_url = urlunsplit(parts._replace(netloc=authority))
+                        request_headers["Host"] = host
+                        extensions["sni_hostname"] = host
                     try:
-                        request_url, request_headers, extensions = url, dict(headers), {}
-                        if host not in ("api.openalex.org", "api.semanticscholar.org", "r.jina.ai"):
-                            address = await public_url(url)
-                            parts = urlsplit(url)
-                            authority = f"[{address}]" if ":" in address else address
-                            request_url = urlunsplit(parts._replace(netloc=authority))
-                            request_headers["Host"] = host
-                            extensions["sni_hostname"] = host
-                        async with self.client.stream(
-                            "POST" if body else "GET",
-                            request_url,
-                            json=body,
-                            headers=request_headers,
-                            extensions=extensions,
-                        ) as response:
-                            if response.status_code in (429, 500, 502, 503, 504):
-                                if attempt == 2:
-                                    raise RuntimeError(
-                                        f"{host}: HTTP {response.status_code}; retry later"
-                                    )
-                                retry = response.headers.get("retry-after", "")
-                                delay = float(retry) if retry.isdigit() else 0.5 * 2**attempt
-                                if delay > 3:
-                                    raise RuntimeError(f"{host}: retry after {retry}s; retry later")
-                                await asyncio.sleep(delay)
-                                continue
-                            if response.is_redirect:
-                                target = urljoin(url, response.headers.get("location", ""))
-                                await public_url(target)
-                                if urlsplit(target).hostname != original_host:
-                                    headers = {"User-Agent": headers["User-Agent"]}
-                                url, body = target, None
-                                break
-                            if response.status_code >= 400:
-                                raise RuntimeError(f"{host}: HTTP {response.status_code}")
-                            chunks, size = [], 0
-                            async for chunk in response.aiter_bytes():
-                                size += len(chunk)
-                                if size > max_bytes:
-                                    raise ValueError("Remote response exceeds byte limit")
-                                chunks.append(chunk)
-                            return b"".join(chunks)
+                        # Hold a connection slot only while a request is in flight, never
+                        # while backing off, so one throttled provider cannot stall the rest.
+                        async with (
+                            self.slots,
+                            self.client.stream(
+                                "POST" if body else "GET",
+                                request_url,
+                                json=body,
+                                headers=request_headers,
+                                extensions=extensions,
+                            ) as response,
+                        ):
+                            status, response_headers = response.status_code, response.headers
+                            if status in (429, 500, 502, 503, 504) or response.is_redirect:
+                                pass
+                            elif status >= 400:
+                                raise RuntimeError(f"{host}: HTTP {status}")
+                            else:
+                                chunks, size = [], 0
+                                async for chunk in response.aiter_bytes():
+                                    size += len(chunk)
+                                    if size > max_bytes:
+                                        raise ValueError("Remote response exceeds byte limit")
+                                    chunks.append(chunk)
+                                return b"".join(chunks)
                     except httpx.TransportError:
-                        if attempt == 2:
+                        if attempt == self.attempts - 1:
                             raise RuntimeError(f"{host}: network request failed") from None
                         await asyncio.sleep(0.5 * 2**attempt)
+                        continue
+                    if status in (301, 302, 303, 307, 308):
+                        target = urljoin(url, response_headers.get("location", ""))
+                        await public_url(target)
+                        if urlsplit(target).hostname != original_host:
+                            headers = {"User-Agent": headers["User-Agent"]}
+                        url, body = target, None
+                        break
+                    if host == "api.openalex.org" and (
+                        response_headers.get("x-ratelimit-remaining") == "0"
+                    ):
+                        raise RuntimeError(f"{host}: daily budget exhausted; set its API key")
+                    retry = response_headers.get("retry-after", "")
+                    # Keyless Semantic Scholar shares one pool; it needs longer waits.
+                    base = 2.0 if host == "api.semanticscholar.org" else 1.0
+                    delay = float(retry) if retry.isdigit() else base * 2**attempt
+                    if attempt == self.attempts - 1 or delay > self.max_wait:
+                        if status in (429, 503):
+                            self.down_until[host] = time.monotonic() + self.cooldown
+                        raise RuntimeError(f"{host}: HTTP {status}; retry later")
+                    await asyncio.sleep(delay)
             raise RuntimeError("Too many redirects")
 
     async def json(self, url, *, body=None):

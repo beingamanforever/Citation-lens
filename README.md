@@ -1,68 +1,68 @@
 # Citation Lens
 
-A research plugin for Codex and Claude Code.
-Search papers, follow citations, and read text and figures from the papers you choose.
+A literature-research plugin for Codex and Claude Code.
+Give it a research question; it finds the defining papers, walks their citation graph forward and backward like [Connected Papers](https://www.connectedpapers.com/about), surfaces the newest preprints, and hands the agent compact previews it can verify and cite.
 
-## About
+## How it works
 
-Citation Lens searches OpenAlex, Semantic Scholar and arXiv, then lets your agent explore the papers behind a topic.
-It supports broader searches by limiting what gets fetched and what enters the agent's context.
+1. **Search broadly, in parallel.** One call runs every query variant on Semantic Scholar, OpenAlex and arXiv at once, merges duplicate versions, and fuses the rankings.
+   A recent lane reserves every third card for work from the last two years when available.
+2. **Expand the citation graph.** From 3-6 seed papers Lens collects their references, their citing papers (newest from Semantic Scholar, most cited from OpenAlex) and Semantic Scholar's similar papers, then reads the candidates' own reference lists to measure bibliographic coupling and co-citation.
+   Neighbors come back in three lanes: **foundation** (prior work the graph cites), **follow-up** (work that cites or resembles the seeds, ranked by shared references) and **recent** (the last two years).
+3. **Preview, then read.** A card is about 500 bytes: ID, title, year, citations, URL, why it was chosen, and one verbatim abstract sentence matching the query.
+   Abstracts, full text and figures are separate, on-demand calls.
+   Snapshots page from a local cache without new requests.
+4. **Cite real links.** Edges are citing -> cited pairs taken from reference lists; shared references and similarity are labeled as such and never reported as citations.
 
-- **Search together.** Run query variants across providers concurrently, with rate limits, and merge duplicate papers by their identifiers.
-- **Reuse the work.** Cache provider responses locally and save citation graphs so searches, result pages and graph branches can be revisited without starting over.
-- **Read selectively.** Screen short paper cards before fetching text or figures.
-  Read selected passages without repeating the paper overview on every page.
-  The bundled Python client can filter results before they reach the agent.
-- **Follow the evidence.** Explore references and citing papers, inspect tables, equations and original figures, and keep source links, sampling limits and provider errors visible.
-
-These choices reduce repeated requests and unnecessary context while leaving the agent in control of what to read next.
-Savings depend on the search and how much evidence you read.
+The agent stays in charge of judgment: Lens gathers, ranks and previews; the agent screens, verifies and writes.
 
 ## Install
 
-Requires **Python 3.11+**, [uv](https://docs.astral.sh/uv/getting-started/installation/), and Git.
-Dependencies download on first use.
-Restart your agent after installation.
-
-**Codex**
+Requires Python 3.11+, [uv](https://docs.astral.sh/uv/getting-started/installation/) and Git.
+Restart your agent after installing.
 
 ```bash
 codex plugin marketplace add beingamanforever/Citation-lens
 codex plugin add citation-lens@citation-lens
 ```
 
-**Claude Code**
-
 ```bash
 claude plugin marketplace add beingamanforever/Citation-lens
 claude plugin install citation-lens@citation-lens
 ```
 
+Optional API keys can increase provider access; their effect on end-to-end performance is not measured here.
+Set `OPENALEX_API_KEY` ([OpenAlex settings](https://openalex.org/settings/api)) and `SEMANTIC_SCHOLAR_API_KEY` ([request form](https://www.semanticscholar.org/product/api#api-key-form)).
+
 ## Use
 
-Ask either agent:
+> Use Citation Lens to research memory-efficient exact attention: foundations, the most
+> influential follow-ups and the newest work, with citation links.
 
-> Use Citation Lens to research memory-efficient attention.
-> Search across providers, follow references and citing papers, then read the most relevant methods, results and figures.
-> Compare the evidence and explain the gaps.
-
-In Claude Code, you can also use `/citation-lens:research <topic>`.
-
-[Tool examples, programmatic search and standalone MCP](docs/USAGE.md).
+In Claude Code you can also run `/citation-lens:research <topic>`.
+[Tools, standalone MCP and scripting](docs/USAGE.md).
 
 ## Results
 
-[Benchmarks](docs/BENCHMARKS.md) contain exact measurements, failures, cases where batching costs more, and reproduction commands.
-They distinguish local fixtures and live provider runs from unmeasured whole-agent latency, token billing and research quality.
+The goal is more relevant papers and trustworthy citations than the host's default web research, under a matched budget.
+Quality, completion rate, time and tokens are measured separately.
 
-## Access and limits
+A corrected Codex evaluation covers 10 held-out tasks, twice each.
+The blinded judge favored Lens in **17 pairs**, with one loss and two ties.
+The saved answers were regraded after fixing URL, quote and citation checks ([protocol and limits](docs/EVALUATION.md), [papers and evidence](docs/results/codex-heldout.json)).
 
-Optional `OPENALEX_API_KEY` and `SEMANTIC_SCHOLAR_API_KEY` improve provider access; Jina Reader is opt-in.
-Citation indexes can lag, graphs have size limits, and PDF extraction can lose structure.
-Use a vision-capable agent for figures.
-Queries go to their providers; cache and snapshots stay local.
-[Privacy](docs/PRIVACY.md).
+| Mean per attempt | Codex | Codex + Lens |
+| --- | ---: | ---: |
+| Directly relevant papers | 13.1 | 19.2 |
+| Recent useful papers | 5.6 | 9.1 |
+| Verified links between useful papers | 2.7 | 8.5 |
+| Completed attempts | 19 / 20 | 18 / 20 |
+| Seconds | 258 | 335 |
 
-[Design](docs/DESIGN.md) · [Development](docs/PUBLISHING.md) · [Releases](https://github.com/beingamanforever/Citation-lens/releases)
+Lens took about 30% longer in this run.
+Reported input-token usage was also higher; timed-out attempts did not report usage, so total consumed tokens are unknown.
+These measurements used keyless providers and an earlier package snapshot.
+The paired Claude Code comparison is running; a measured Claude advantage is not established yet.
 
-[MIT license](LICENSE).
+[Design and research basis](docs/DESIGN.md) · [Privacy](docs/PRIVACY.md) ·
+[Development](docs/PUBLISHING.md) · [MIT license](LICENSE)
