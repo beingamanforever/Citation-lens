@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -9,6 +10,21 @@ from conftest import run
 from citation_lens.graph import payload
 from citation_lens.network import Web, public_url
 from citation_lens.storage import Store
+
+
+class WaitingStream(httpx.AsyncByteStream):
+    def __init__(self, started, release, finished):
+        self.started = started
+        self.release = release
+        self.finished = finished
+
+    async def __aiter__(self):
+        self.started.set()
+        try:
+            await self.release.wait()
+            yield b"ok"
+        finally:
+            self.finished.set()
 
 
 def test_cache_survives_restart_and_expires(tmp_path):
@@ -40,6 +56,170 @@ def test_single_flight_cache_and_byte_limit(store):
         assert await web.json(url) == first and web.hits == 1
         with pytest.raises(ValueError):
             await web.fetch(url + "2", max_bytes=2)
+        await web.close()
+
+    run(exercise())
+
+
+def test_crossref_serializes_and_spaces_distinct_requests(store):
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    first_finished = asyncio.Event()
+    starts = []
+
+    async def respond(request):
+        starts.append(time.monotonic())
+        if len(starts) == 1:
+            return httpx.Response(
+                200, stream=WaitingStream(first_started, release_first, first_finished)
+            )
+        assert first_finished.is_set()
+        return httpx.Response(200, content=b"second")
+
+    async def exercise():
+        web = Web(store, httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+        with patch("citation_lens.network.public_url", new=AsyncMock(return_value="8.8.8.8")):
+            first = asyncio.create_task(web.fetch("https://api.crossref.org/works/first"))
+            await first_started.wait()
+            second = asyncio.create_task(web.fetch("https://api.crossref.org/works/second"))
+            await asyncio.sleep(0.2)
+            assert len(starts) == 1
+            release_first.set()
+            assert await asyncio.gather(first, second) == [b"ok", b"second"]
+        assert starts[1] - starts[0] >= 1.05
+        await web.close()
+
+    run(exercise())
+
+
+def test_other_host_progresses_while_crossref_is_pacing(store):
+    ordinary_started = asyncio.Event()
+
+    async def respond(request):
+        if request.headers["host"] == "public.example":
+            ordinary_started.set()
+        return httpx.Response(200, content=b"ok")
+
+    async def exercise():
+        web = Web(store, httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+        web.slots = asyncio.Semaphore(1)
+        web.next_at["api.crossref.org"] = time.monotonic() + 0.3
+        with patch("citation_lens.network.public_url", new=AsyncMock(return_value="8.8.8.8")):
+            crossref = asyncio.create_task(web.fetch("https://api.crossref.org/works/waiting"))
+            for _ in range(10):
+                if web.crossref_slot.locked():
+                    break
+                await asyncio.sleep(0)
+            assert web.crossref_slot.locked()
+            ordinary = asyncio.create_task(web.fetch("https://public.example/paper"))
+            await asyncio.wait_for(ordinary_started.wait(), 0.1)
+            assert await ordinary == b"ok"
+            assert await crossref == b"ok"
+        await web.close()
+
+    run(exercise())
+
+
+def test_crossref_spaces_retries_and_redirects(store):
+    starts = []
+
+    async def respond(request):
+        starts.append(time.monotonic())
+        if len(starts) == 1:
+            return httpx.Response(429, headers={"retry-after": "0"})
+        if len(starts) == 2:
+            return httpx.Response(302, headers={"location": "/works/redirected"})
+        return httpx.Response(200, content=b"ok")
+
+    async def exercise():
+        web = Web(store, httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+        with patch("citation_lens.network.public_url", new=AsyncMock(return_value="8.8.8.8")):
+            assert await web.fetch("https://api.crossref.org/works/retrying") == b"ok"
+        assert len(starts) == 3
+        assert all(
+            later - earlier >= 1.05 for earlier, later in zip(starts, starts[1:], strict=False)
+        )
+        await web.close()
+
+    run(exercise())
+
+
+def test_crossref_cancellation_releases_queued_and_streaming_attempts(store):
+    streaming_started = asyncio.Event()
+    never_release = asyncio.Event()
+    streaming_finished = asyncio.Event()
+    seen = []
+
+    async def respond(request):
+        case = request.url.params["case"]
+        seen.append(case)
+        if case == "streaming":
+            return httpx.Response(
+                200, stream=WaitingStream(streaming_started, never_release, streaming_finished)
+            )
+        return httpx.Response(200, content=b"fresh")
+
+    async def exercise():
+        web = Web(store, httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+        with patch("citation_lens.network.public_url", new=AsyncMock(return_value="8.8.8.8")):
+            streaming = asyncio.create_task(
+                web.fetch("https://api.crossref.org/works?case=streaming")
+            )
+            await streaming_started.wait()
+            queued = asyncio.create_task(web.fetch("https://api.crossref.org/works?case=queued"))
+            await asyncio.sleep(0.02)
+            queued.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await queued
+
+            streaming.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await streaming
+            assert streaming_finished.is_set()
+            assert (
+                await asyncio.wait_for(web.fetch("https://api.crossref.org/works?case=after"), 1.3)
+                == b"fresh"
+            )
+
+        assert seen == ["streaming", "after"]
+        await web.close()
+
+    run(exercise())
+
+
+def test_crossref_cancellation_before_headers_preserves_start_spacing(store):
+    first_started = asyncio.Event()
+    never_send_headers = asyncio.Event()
+    starts = []
+
+    async def respond(request):
+        starts.append(time.monotonic())
+        if request.url.path.endswith("/first"):
+            first_started.set()
+            await never_send_headers.wait()
+        return httpx.Response(200, content=b"fresh")
+
+    async def exercise():
+        web = Web(store, httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+        web.slots = asyncio.Semaphore(1)
+        with patch("citation_lens.network.public_url", new=AsyncMock(return_value="8.8.8.8")):
+            first = asyncio.create_task(web.fetch("https://api.crossref.org/works/first"))
+            await first_started.wait()
+            first.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await first
+            assert not web.pending
+            assert not web.crossref_slot.locked()
+
+            assert (
+                await asyncio.wait_for(web.fetch("https://api.crossref.org/works/second"), 1.3)
+                == b"fresh"
+            )
+
+        await asyncio.sleep(0.05)
+        assert len(starts) == 2
+        assert starts[1] - starts[0] >= 1.05
+        assert not web.pending
         await web.close()
 
     run(exercise())

@@ -78,6 +78,16 @@ def original_host(request):
     return request.headers.get("host", request.url.host).split(":", 1)[0]
 
 
+def crossref_record(doi, *, abstract="Recovered graph routing evidence."):
+    return {
+        "DOI": doi,
+        "title": ["Exact graph routing evidence"],
+        "author": [{"given": "Example", "family": "Author"}],
+        "published": {"date-parts": [[2025, 1, 2]]},
+        "abstract": f"<jats:p>{abstract}</jats:p>",
+    }
+
+
 @asynccontextmanager
 async def connected_session(tmp_path, monkeypatch, handler):
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -691,6 +701,9 @@ def test_backward_expand_uses_one_primary_arxiv_batch_after_index_outages(tmp_pa
         if host == "export.arxiv.org":
             assert request.url.params["id_list"] == "2401.00001"
             return httpx.Response(200, content=arxiv_feed())
+        if host == "api.crossref.org":
+            assert "10.9999/unresolved" in request.url.path
+            return httpx.Response(404)
         raise AssertionError(f"Unexpected request: {request.method} {request.url}")
 
     async def exercise():
@@ -734,13 +747,15 @@ def test_backward_expand_uses_one_primary_arxiv_batch_after_index_outages(tmp_pa
             assert "1 unresolved identifier/item(s)" in errors
             assert "DOI:10.9999/unresolved" in errors
 
-            assert web.requests == len(requests) == 4
+            assert web.requests == len(requests) == 5
             assert sum(host == "api.semanticscholar.org" for _, host, _, _ in requests) == 1
             assert sum(host == "api.openalex.org" for _, host, _, _ in requests) == 1
             assert sum(host == "export.arxiv.org" for _, host, _, _ in requests) == 1
             assert not any("search" in path for _, _, path, _ in requests)
+            assert sum(host == "api.crossref.org" for _, host, _, _ in requests) == 1
             assert not any(
-                "10.9999" in path or "10.9999" in query for _, _, path, query in requests
+                ("10.9999" in path or "10.9999" in query) and host != "api.crossref.org"
+                for _, host, path, query in requests
             )
 
     run(exercise())
@@ -1013,5 +1028,200 @@ def test_shared_primary_html_survives_one_cancelled_caller(tmp_path, monkeypatch
             assert body["edges"] == [["ARXIV:2501.00001", "ARXIV:2401.00001"]]
             assert sum(host == "arxiv.org" for host, _ in requests) == 1
             assert web.pending == {} and web.waiters == {}
+
+    run(exercise())
+
+
+def test_read_recovers_exact_crossref_evidence_and_reuses_cache(tmp_path, monkeypatch):
+    doi = "10.1234/recovered-evidence"
+    requests = []
+
+    async def respond(request):
+        host = original_host(request)
+        requests.append((host, request.url.path))
+        if host == "api.semanticscholar.org":
+            return httpx.Response(200, json=[None])
+        if host == "api.openalex.org":
+            return httpx.Response(404)
+        if host == "api.crossref.org":
+            return httpx.Response(200, json={"message": crossref_record(doi)})
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    async def exercise():
+        async with connected_session(tmp_path, monkeypatch, respond) as (session, web):
+            result = await session.call_tool(
+                "research_read", {"paper_id": "https://doi.org/" + doi, "part": "abstract"}
+            )
+            body = json.loads(result.content[0].text)
+            assert not result.isError and body["missing"] == []
+            paper = body["papers"][0]
+            assert paper["id"] == "DOI:" + doi
+            assert paper["url"] == "https://doi.org/" + doi
+            assert paper["abstract"] == "Recovered graph routing evidence."
+            assert paper["abstract_source"] == "crossref"
+            request_count = len(requests)
+            repeated = await session.call_tool(
+                "research_read", {"paper_id": "DOI:" + doi, "part": "abstract"}
+            )
+            assert not repeated.isError
+            assert json.loads(repeated.content[0].text)["papers"] == body["papers"]
+            assert len(requests) == request_count == web.requests
+            assert sum(host == "api.crossref.org" for host, _ in requests) == 1
+
+    run(exercise())
+
+
+def test_expand_hydrates_doi_node_without_changing_primary_edge_proof(tmp_path, monkeypatch):
+    seed = s2("seed", "Graph routing seed", 2025, 20, "Seed evidence.", arxiv="2501.00001")
+    save_papers(tmp_path, seed)
+    doi = "10.1234/bibliography-evidence"
+    requests = []
+
+    async def respond(request):
+        host = original_host(request)
+        requests.append((host, request.url.path))
+        if host == "api.semanticscholar.org":
+            return httpx.Response(200, json=[None])
+        if host == "api.openalex.org":
+            return httpx.Response(404)
+        if host == "arxiv.org":
+            return httpx.Response(
+                200,
+                content=f"""<html><body><li class="ltx_bibitem" id="bib.exact-doi">
+                  <a href="https://doi.org/{doi}">Reference</a>
+                </li></body></html>""".encode(),
+            )
+        if host == "api.crossref.org":
+            return httpx.Response(200, json={"message": crossref_record(doi)})
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    async def exercise():
+        async with connected_session(tmp_path, monkeypatch, respond) as (session, web):
+            expanded = await session.call_tool(
+                "research_expand",
+                {
+                    "seed_ids": ["ARXIV:2501.00001"],
+                    "query": "graph routing evidence",
+                    "direction": "backward",
+                },
+            )
+            body = json.loads(expanded.content[0].text)
+            assert not expanded.isError
+            assert body["papers"][0]["id"] == "DOI:" + doi
+            assert body["edges"] == [[seed["id"], "DOI:" + doi]]
+            assert body["edge_evidence"] == [
+                {
+                    "edge": [seed["id"], "DOI:" + doi],
+                    "matched_id": "DOI:" + doi,
+                    "source": "primary_arxiv",
+                    "url": "https://arxiv.org/html/2501.00001#bib.exact-doi",
+                }
+            ]
+            assert body["seeds"][0]["reference_coverage"]["unresolved"] == 0
+            request_count = len(requests)
+            page = await session.call_tool("research_graph", {"graph_id": body["graph_id"]})
+            assert not page.isError
+            assert json.loads(page.content[0].text)["edge_evidence"] == body["edge_evidence"]
+            read = await session.call_tool(
+                "research_read", {"paper_id": "DOI:" + doi, "part": "abstract"}
+            )
+            assert not read.isError
+            read_body = json.loads(read.content[0].text)
+            assert read_body["papers"][0]["abstract_source"] == "crossref"
+            assert len(requests) == request_count == web.requests
+
+    run(exercise())
+
+
+def test_read_does_not_turn_crossref_math_markup_into_a_quote(tmp_path, monkeypatch):
+    doi = "10.1234/formula-evidence"
+
+    async def respond(request):
+        host = original_host(request)
+        if host == "api.semanticscholar.org":
+            return httpx.Response(200, json=[None])
+        if host == "api.openalex.org":
+            return httpx.Response(404)
+        if host == "api.crossref.org":
+            record = crossref_record(
+                doi, abstract="Evidence uses <mml:math><mml:mi>x</mml:mi></mml:math>."
+            )
+            return httpx.Response(200, json={"message": record})
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    async def exercise():
+        async with connected_session(tmp_path, monkeypatch, respond) as (session, _):
+            result = await session.call_tool(
+                "research_read", {"paper_id": "DOI:" + doi, "part": "abstract"}
+            )
+            body = json.loads(result.content[0].text)
+            assert not result.isError and body["missing"] == []
+            assert body["papers"][0]["id"] == "DOI:" + doi
+            assert body["papers"][0]["abstract"] is None
+            assert body["papers"][0]["abstract_source"] is None
+
+    run(exercise())
+
+
+def test_expand_retains_completed_doi_page_when_next_page_times_out(tmp_path, monkeypatch):
+    seed = s2("seed", "Graph routing seed", 2025, 20, "Seed evidence.", arxiv="2501.00001")
+    save_papers(tmp_path, seed)
+    dois = [f"10.1234/reference-{index}" for index in range(21)]
+    stream = StallingStream()
+    bibliography = "".join(
+        f'<li class="ltx_bibitem" id="bib.{index}">'
+        f'<a href="https://doi.org/{doi}">Reference</a></li>'
+        for index, doi in enumerate(dois)
+    ).encode()
+
+    async def respond(request):
+        host = original_host(request)
+        if host == "api.semanticscholar.org":
+            return httpx.Response(200, json=[None] * len(json.loads(request.content)["ids"]))
+        if host == "api.openalex.org":
+            return httpx.Response(404)
+        if host == "arxiv.org":
+            return httpx.Response(200, content=bibliography)
+        if host == "api.crossref.org":
+            if request.url.path == "/works":
+                rows = []
+                for index, doi in enumerate(dois[:20]):
+                    record = crossref_record(doi)
+                    record["title"] = [f"Graph routing prior evidence {index}"]
+                    rows.append(record)
+                return httpx.Response(200, json={"message": {"items": rows}})
+            return httpx.Response(200, stream=stream)
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    async def exercise():
+        monkeypatch.setattr(papers, "PRIMARY_REFERENCE_SECONDS", 1.4)
+        async with connected_session(tmp_path, monkeypatch, respond) as (session, web):
+            result = await session.call_tool(
+                "research_expand",
+                {
+                    "seed_ids": [seed["id"]],
+                    "query": "graph routing evidence",
+                    "direction": "backward",
+                    "limit": 60,
+                },
+            )
+            body = json.loads(result.content[0].text)
+            assert not result.isError
+            assert {paper["id"] for paper in body["papers"]} == {"DOI:" + doi for doi in dois[:20]}
+            coverage = body["seeds"][0]["reference_coverage"]
+            assert coverage["returned"] == 20 and coverage["unresolved"] == 1
+            assert len(body["edge_evidence"]) == 20
+            assert all(proof["source"] == "primary_arxiv" for proof in body["edge_evidence"])
+            assert all("#bib." in proof["url"] for proof in body["edge_evidence"])
+            assert any("timed out" in error["error"] for error in body["errors"])
+            assert stream.started.is_set() and stream.cancelled.is_set()
+            assert not web.pending and not web.waiters
+            request_count = web.requests
+            cached = await session.call_tool(
+                "research_read", {"paper_id": "DOI:" + dois[0], "part": "abstract"}
+            )
+            assert not cached.isError
+            assert json.loads(cached.content[0].text)["papers"][0]["abstract_source"] == "crossref"
+            assert web.requests == request_count
 
     run(exercise())

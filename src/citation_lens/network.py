@@ -7,6 +7,7 @@ import json
 import os
 import socket
 import time
+from contextlib import nullcontext
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
@@ -47,6 +48,7 @@ class Web:
             timeout=20, follow_redirects=False, trust_env=False
         )
         self.slots = asyncio.Semaphore(6)
+        self.crossref_slot = asyncio.Semaphore(1)
         self.locks: dict[str, asyncio.Lock] = {}
         self.next_at: dict[str, float] = {}
         self.pending: dict[str, asyncio.Task] = {}
@@ -110,48 +112,72 @@ class Web:
                     raise RuntimeError(f"{host}: throttled; skipped for {wait:.0f}s")
                 for attempt in range(self.attempts):
                     # S2 keys commonly begin at 1 request/s. arXiv asks for 3s pacing.
-                    interval = {"api.semanticscholar.org": 1.05, "export.arxiv.org": 3.05}.get(
-                        host, 0.15
-                    )
-                    async with self.locks.setdefault(host, asyncio.Lock()):
-                        await asyncio.sleep(max(0, self.next_at.get(host, 0) - time.monotonic()))
-                        self.next_at[host] = time.monotonic() + interval
-                    request_url, request_headers, extensions = url, dict(headers), {}
-                    if host not in ("api.openalex.org", "api.semanticscholar.org", "r.jina.ai"):
-                        address = await public_url(url)
-                        parts = urlsplit(url)
-                        authority = f"[{address}]" if ":" in address else address
-                        request_url = urlunsplit(parts._replace(netloc=authority))
-                        request_headers["Host"] = host
-                        extensions["sni_hostname"] = host
+                    interval = {
+                        "api.crossref.org": 1.05,
+                        "api.semanticscholar.org": 1.05,
+                        "export.arxiv.org": 3.05,
+                    }.get(host, 0.15)
+                    is_crossref = host == "api.crossref.org"
                     try:
-                        # Hold a connection slot only while a request is in flight, never
-                        # while backing off, so one throttled provider cannot stall the rest.
-                        async with self.slots:
-                            if (wait := self.down_until.get(host, 0) - time.monotonic()) > 0:
-                                raise RuntimeError(f"{host}: throttled; skipped for {wait:.0f}s")
-                            self.requests += 1
-                            async with self.client.stream(
-                                "POST" if body else "GET",
-                                request_url,
-                                json=body,
-                                headers=request_headers,
-                                extensions=extensions,
-                            ) as response:
-                                status, response_headers = response.status_code, response.headers
-                                if status in (429, 500, 502, 503, 504) or response.is_redirect:
-                                    pass
-                                elif status >= 400:
-                                    raise RuntimeError(f"{host}: HTTP {status}")
-                                else:
-                                    chunks, size = [], 0
-                                    async for chunk in response.aiter_bytes():
-                                        size += len(chunk)
-                                        if size > max_bytes:
-                                            raise ValueError("Remote response exceeds byte limit")
-                                        chunks.append(chunk)
-                                    return b"".join(chunks)
+                        attempt_slot = self.crossref_slot if is_crossref else nullcontext()
+                        async with attempt_slot:
+                            async with self.locks.setdefault(host, asyncio.Lock()):
+                                await asyncio.sleep(
+                                    max(0, self.next_at.get(host, 0) - time.monotonic())
+                                )
+                                if not is_crossref:
+                                    self.next_at[host] = time.monotonic() + interval
+                            request_url, request_headers, extensions = url, dict(headers), {}
+                            if host not in (
+                                "api.openalex.org",
+                                "api.semanticscholar.org",
+                                "r.jina.ai",
+                            ):
+                                address = await public_url(url)
+                                parts = urlsplit(url)
+                                authority = f"[{address}]" if ":" in address else address
+                                request_url = urlunsplit(parts._replace(netloc=authority))
+                                request_headers["Host"] = host
+                                extensions["sni_hostname"] = host
+                            # Hold a connection slot only while a request is in flight, never
+                            # while pacing or backing off, so one provider cannot stall the rest.
+                            async with self.slots:
+                                if (wait := self.down_until.get(host, 0) - time.monotonic()) > 0:
+                                    raise RuntimeError(
+                                        f"{host}: throttled; skipped for {wait:.0f}s"
+                                    )
+                                self.requests += 1
+                                request_stream = self.client.stream(
+                                    "POST" if body else "GET",
+                                    request_url,
+                                    json=body,
+                                    headers=request_headers,
+                                    extensions=extensions,
+                                )
+                                if is_crossref:
+                                    self.next_at[host] = time.monotonic() + interval
+                                async with request_stream as response:
+                                    if is_crossref:
+                                        self.next_at[host] = time.monotonic() + interval
+                                    status = response.status_code
+                                    response_headers = response.headers
+                                    if status in (429, 500, 502, 503, 504) or response.is_redirect:
+                                        pass
+                                    elif status >= 400:
+                                        raise RuntimeError(f"{host}: HTTP {status}")
+                                    else:
+                                        chunks, size = [], 0
+                                        async for chunk in response.aiter_bytes():
+                                            size += len(chunk)
+                                            if size > max_bytes:
+                                                raise ValueError(
+                                                    "Remote response exceeds byte limit"
+                                                )
+                                            chunks.append(chunk)
+                                        return b"".join(chunks)
                     except httpx.TransportError:
+                        if is_crossref:
+                            self.next_at[host] = time.monotonic() + interval
                         if attempt == self.attempts - 1:
                             raise RuntimeError(f"{host}: network request failed") from None
                         await asyncio.sleep(0.5 * 2**attempt)

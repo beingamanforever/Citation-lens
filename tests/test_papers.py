@@ -11,6 +11,7 @@ from citation_lens.network import Web
 from citation_lens.papers import (
     Papers,
     from_arxiv,
+    from_crossref,
     from_openalex,
     from_s2,
     identifier,
@@ -74,6 +75,86 @@ def test_provider_whitespace_is_not_treated_as_abstract_evidence():
         }
     )
     assert paper["abstract"] == "" and paper["abstract_source"] is None
+
+
+@pytest.mark.parametrize(
+    ("dates", "year", "date"),
+    [
+        ({"published": {"date-parts": [[2024, 2, 29]]}}, 2024, "2024-02-29"),
+        ({"published-online": {"date-parts": [[2023]]}}, 2023, None),
+        ({"published-print": {"date-parts": [[2022, 7]]}}, 2022, None),
+        (
+            {
+                "published": {"date-parts": [[2024, 2, 30]]},
+                "issued": {"date-parts": [[2021, 5, 4]]},
+            },
+            2021,
+            "2021-05-04",
+        ),
+        ({"deposited": {"date-parts": [[2020, 1, 1]]}}, None, None),
+    ],
+)
+def test_crossref_record_uses_only_valid_publication_dates(dates, year, date):
+    paper = from_crossref({"DOI": "10.1000/dated", "title": ["Dated paper"]} | dates)
+    assert (paper["year"], paper["date"]) == (year, date)
+
+
+def test_crossref_record_preserves_plain_jats_and_rejects_unsafe_notation():
+    paper = from_crossref(
+        {
+            "DOI": "10.1000/jats",
+            "title": ["JATS paper"],
+            "abstract": (
+                "<jats:p>First <jats:italic>result</jats:italic>: x &lt; y + z.</jats:p>"
+                "<jats:p>Second paragraph.</jats:p>"
+            ),
+        }
+    )
+    assert paper["abstract"] == "First result: x < y + z.\n\nSecond paragraph."
+    assert paper["abstract_source"] == "crossref"
+
+    structured = from_crossref(
+        {
+            "DOI": "10.1000/structured",
+            "title": ["Structured paper"],
+            "abstract": (
+                "<jats:sec><jats:title>Trial results</jats:title>"
+                "<jats:p>Methods<jats:break/>Results.</jats:p></jats:sec>"
+            ),
+        }
+    )
+    assert structured["abstract"] == "Trial results\n\nMethods\nResults."
+
+    unsafe = from_crossref(
+        {
+            "DOI": "10.1000/math",
+            "title": ["Math paper"],
+            "abstract": "<jats:p>H<jats:sub>2</jats:sub>O</jats:p>",
+        }
+    )
+    assert unsafe["abstract"] == "" and unsafe["abstract_source"] is None
+
+    graphic = from_crossref(
+        {
+            "DOI": "10.1000/graphic",
+            "title": ["Graphic paper"],
+            "abstract": "<jats:p>Result <svg><path /></svg> follows.</jats:p>",
+        }
+    )
+    assert graphic["abstract"] == "" and graphic["abstract_source"] is None
+
+
+def test_crossref_record_ignores_malformed_author_shapes():
+    no_list = from_crossref({"DOI": "10.1000/no-authors", "title": ["No authors"], "author": 42})
+    fallback_name = from_crossref(
+        {
+            "DOI": "10.1000/fallback-author",
+            "title": ["Fallback author"],
+            "author": [{"name": {"unexpected": "object"}, "given": "Ada", "family": "Lovelace"}],
+        }
+    )
+    assert no_list["authors"] == []
+    assert fallback_name["authors"] == ["Ada Lovelace"]
 
 
 def test_arxiv_feed_parsing_skips_error_entries():
@@ -251,6 +332,34 @@ def test_merge_tracks_the_provider_of_the_selected_abstract():
     assert paper["abstract_source"] == "openalex"
 
 
+def test_crossref_merge_only_fills_missing_provider_metadata():
+    indexed = from_s2(
+        {
+            "paperId": "a" * 40,
+            "title": "Indexed title",
+            "publicationDate": "2024-05-01",
+            "authors": [{"name": "Indexed Author"}],
+            "citationCount": 7,
+            "externalIds": {"DOI": "10.1000/shared"},
+        }
+    )
+    deposited = from_crossref(
+        {
+            "DOI": "10.1000/shared",
+            "title": ["Deposited title"],
+            "author": [{"given": "Deposited", "family": "Writer"}],
+            "published": {"date-parts": [[2020, 1, 2]]},
+            "abstract": "<jats:p>Recovered abstract.</jats:p>",
+        }
+    )
+    paper = merge([indexed, deposited])[0][0]
+    assert paper["title"] == "Indexed title"
+    assert paper["authors"] == ["Indexed Author"]
+    assert (paper["year"], paper["date"], paper["citations"]) == (2024, "2024-05-01", 7)
+    assert paper["abstract"] == "Recovered abstract."
+    assert paper["sources"] == ["semantic_scholar", "crossref"]
+
+
 def test_strict_providers_remove_stopwords_and_keep_phrases():
     assert strict_terms("the exact attention for memory and online softmax") == [
         "exact",
@@ -340,6 +449,162 @@ def provider(store, respond):
     web = Web(store, httpx.AsyncClient(transport=httpx.MockTransport(respond)))
     web.next_at = {"api.semanticscholar.org": -1e9, "export.arxiv.org": -1e9}
     return Papers(web)
+
+
+def test_crossref_batch_matches_unordered_rows_by_exact_doi_and_deduplicates(store, monkeypatch):
+    requests = []
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        requests.append(str(request.url))
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "items": [
+                        {"DOI": "10.1000/unrelated", "title": ["Unrelated"]},
+                        {"DOI": "10.1000/B", "title": ["Second"]},
+                        {"DOI": "10.1000/a", "title": ["First"]},
+                    ]
+                }
+            },
+        )
+
+    async def exercise():
+        papers = provider(store, respond)
+        found, errors = await papers._crossref_batch(["10.1000/A", "DOI:10.1000/b", "10.1000/a"])
+        assert list(found) == ["DOI:10.1000/a", "DOI:10.1000/b"]
+        assert [found[doi]["title"] for doi in found] == ["First", "Second"]
+        assert errors == {}
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+    assert len(requests) == 1 and "rows=2" in requests[0]
+
+
+def test_crossref_batch_keeps_safe_peer_and_metadata_when_one_abstract_is_unsafe(
+    store, monkeypatch
+):
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(_request):
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "items": [
+                        {
+                            "DOI": "10.1000/unsafe",
+                            "title": ["Unsafe abstract"],
+                            "abstract": '<jats:p>See <jats:graphic href="formula.png"/>.</jats:p>',
+                        },
+                        {
+                            "DOI": "10.1000/safe",
+                            "title": ["Safe abstract"],
+                            "abstract": "<jats:p>Usable evidence.</jats:p>",
+                        },
+                    ]
+                }
+            },
+        )
+
+    async def exercise():
+        papers = provider(store, respond)
+        found, errors = await papers._crossref_batch(["10.1000/unsafe", "10.1000/safe"])
+        assert set(found) == {"DOI:10.1000/unsafe", "DOI:10.1000/safe"}
+        assert found["DOI:10.1000/unsafe"]["abstract"] == ""
+        assert found["DOI:10.1000/safe"]["abstract"] == "Usable evidence."
+        assert list(errors) == ["DOI:10.1000/unsafe"]
+        assert len(errors["DOI:10.1000/unsafe"]) <= 160
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"message": {"DOI": "10.1000/wrong", "title": ["Wrong paper"]}},
+        {"message": {"DOI": "10.1000/odd,(x)?", "title": []}},
+        {"message": []},
+    ],
+)
+def test_crossref_singleton_rejects_wrong_or_malformed_payloads(store, monkeypatch, payload):
+    requested = "10.1000/odd,(x)?"
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        assert request.url.raw_path.endswith(b"/works/10.1000%2Fodd%2C%28x%29%3F")
+        return httpx.Response(200, json=payload)
+
+    async def exercise():
+        papers = provider(store, respond)
+        found, errors = await papers._crossref_batch([requested])
+        assert found == {} and list(errors) == ["DOI:" + requested]
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+
+
+def test_crossref_batch_retains_completed_pages_when_deadline_expires(store, monkeypatch):
+    never_respond = asyncio.Event()
+    requested = [f"10.1000/{number}" for number in range(21)]
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        if request.url.path == "/works":
+            return httpx.Response(
+                200,
+                json={
+                    "message": {
+                        "items": [
+                            {"DOI": doi, "title": [f"Paper {doi.rsplit('/', 1)[-1]}"]}
+                            for doi in requested[:20]
+                        ]
+                    }
+                },
+            )
+        await never_respond.wait()
+        raise AssertionError("released unexpectedly")
+
+    async def exercise():
+        papers = provider(store, respond)
+        papers.web.next_at["api.crossref.org"] = -1e9
+        found, errors = await papers._crossref_batch(requested, seconds=0.05)
+        expected = {"DOI:" + doi for doi in requested[:20]}
+        remaining = "DOI:" + requested[20]
+        assert set(found) == expected
+        assert list(errors) == [remaining] and "timed out" in errors[remaining].lower()
+        assert not papers.web.pending
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+
+
+def test_crossref_batch_skips_a_doi_that_cannot_fit_the_url_limit(store):
+    async def respond(request):
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    async def exercise():
+        papers = provider(store, respond)
+        doi = "10.1000/" + "x" * 6000
+        found, errors = await papers._crossref_batch([doi])
+        assert found == {} and "too long" in errors["DOI:" + doi]
+        assert papers.web.requests == 0
+        await papers.web.close()
+
+    run(exercise())
 
 
 def test_batched_references_map_back_by_input_order_and_fall_back(store):
@@ -626,6 +891,8 @@ def test_references_recover_explicit_primary_arxiv_identifiers_after_index_outag
             return httpx.Response(200, content=bibliography)
         if host == "export.arxiv.org":
             return httpx.Response(200, content=feed)
+        if host == "api.crossref.org":
+            return httpx.Response(503)
         raise AssertionError(str(request.url))
 
     async def exercise():
@@ -681,14 +948,91 @@ def test_references_recover_explicit_primary_arxiv_identifiers_after_index_outag
     monkeypatch.setattr("citation_lens.network.public_url", public_ip)
     run(exercise())
 
-    assert [host for host, _, _ in requests] == [
-        "api.semanticscholar.org",
-        "api.openalex.org",
-        "api.openalex.org",
-        "arxiv.org",
-        "export.arxiv.org",
-    ]
-    assert requests[-1][2]["id_list"] == "2101.00001"
+    hosts = [host for host, _, _ in requests]
+    assert hosts.count("api.semanticscholar.org") == 1
+    assert hosts.count("api.openalex.org") == 2
+    assert hosts.count("arxiv.org") == 1
+    assert hosts.count("export.arxiv.org") == 1
+    assert hosts.count("api.crossref.org") == 1
+    assert (
+        next(params for host, _, params in requests if host == "export.arxiv.org")["id_list"]
+        == "2101.00001"
+    )
+
+
+def test_primary_crossref_hydration_preserves_arxiv_aliases_and_ambiguity(store, monkeypatch):
+    html = b"""
+    <ol>
+      <li class="ltx_bibitem" id="bib.doi">
+        <a href="https://doi.org/10.1000/doi-only">DOI</a>
+      </li>
+      <li class="ltx_bibitem" id="bib.alias">
+        <a href="https://arxiv.org/abs/2101.00001">arXiv</a>
+        <a href="https://doi.org/10.1000/alias">DOI</a>
+      </li>
+      <li class="ltx_bibitem" id="bib.ambiguous">
+        <a href="https://arxiv.org/abs/2102.00002">arXiv</a>
+        <a href="https://doi.org/10.1000/unrelated">DOI</a>
+      </li>
+    </ol>
+    """
+    feed = b"""<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:arxiv="http://arxiv.org/schemas/atom"
+      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+      <opensearch:totalResults>2</opensearch:totalResults>
+      <entry><id>http://arxiv.org/abs/2101.00001</id><title>Aliased preprint</title>
+      <arxiv:doi>10.1000/alias</arxiv:doi><published>2021-01-01T00:00:00Z</published></entry>
+      <entry><id>http://arxiv.org/abs/2102.00002</id><title>Different preprint</title>
+      <published>2021-02-01T00:00:00Z</published></entry>
+    </feed>"""
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        host = request.headers["host"]
+        if host == "arxiv.org":
+            return httpx.Response(200, content=html)
+        if host == "export.arxiv.org":
+            return httpx.Response(200, content=feed)
+        assert host == "api.crossref.org"
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "items": [
+                        {"DOI": "10.1000/unrelated", "title": ["Unrelated publication"]},
+                        {"DOI": "10.1000/doi-only", "title": ["DOI publication"]},
+                        {
+                            "DOI": "10.1000/alias",
+                            "title": ["Published preprint"],
+                            "abstract": "<jats:p>Deposited evidence.</jats:p>",
+                        },
+                    ]
+                }
+            },
+        )
+
+    async def exercise():
+        papers = provider(store, respond)
+        seed = s2("a", "Seed", arxiv="2205.14135")
+        result = (await papers._primary_references([(0, seed)]))[0]
+        assert [paper["id"] for paper in result["papers"]] == [
+            "DOI:10.1000/doi-only",
+            "ARXIV:2101.00001",
+        ]
+        assert result["coverage"]["ambiguous"] == 1
+        assert [item["url"].rsplit("#", 1)[-1] for item in result["evidence"]] == [
+            "bib.doi",
+            "bib.alias",
+        ]
+        aliased = papers.cached("DOI:10.1000/alias")
+        assert aliased["id"] == "ARXIV:2101.00001"
+        assert aliased["abstract"] == "Deposited evidence."
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
 
 
 def test_primary_reference_fallback_reports_missing_bibliography_markup(store, monkeypatch):
@@ -741,8 +1085,10 @@ def test_primary_reference_diagnostics_bound_long_identifiers_and_fragments(stor
         return "93.184.216.34"
 
     async def respond(request):
-        assert request.headers["host"] == "arxiv.org"
-        return httpx.Response(200, content=html)
+        if request.headers["host"] == "arxiv.org":
+            return httpx.Response(200, content=html)
+        assert request.headers["host"] == "api.crossref.org"
+        return httpx.Response(404)
 
     async def exercise():
         papers = provider(store, respond)
@@ -751,7 +1097,7 @@ def test_primary_reference_diagnostics_bound_long_identifiers_and_fragments(stor
         assert result["coverage"]["unresolved"] == 1
         assert result["coverage"]["ambiguous"] == 1
         assert all(len(error) <= 160 for error in result["errors"])
-        assert all("[truncated]" in error for error in result["errors"])
+        assert sum("[truncated]" in error for error in result["errors"]) == 2
         await papers.web.close()
 
     monkeypatch.setattr("citation_lens.network.public_url", public_ip)
@@ -820,6 +1166,64 @@ def test_primary_reference_caps_are_round_robin_across_seeds(store, monkeypatch)
     assert len(metadata_batches) == 1 and len(metadata_batches[0]) == 100
     assert sum(paper_id.startswith("2401.") for paper_id in metadata_batches[0]) == 50
     assert sum(paper_id.startswith("2402.") for paper_id in metadata_batches[0]) == 50
+
+
+def test_primary_crossref_deadline_keeps_completed_batch_results(store, monkeypatch):
+    dois = [f"10.1000/reference-{number}" for number in range(21)]
+    bibliography = (
+        "<ol>"
+        + "".join(
+            f'<li class="ltx_bibitem" id="bib.{number}">'
+            f'<a href="https://doi.org/{doi}">reference</a></li>'
+            for number, doi in enumerate(dois)
+        )
+        + "</ol>"
+    ).encode()
+    never_respond = asyncio.Event()
+    crossref_requests = []
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        assert request.headers["host"] == "arxiv.org"
+        return httpx.Response(200, content=bibliography)
+
+    async def exercise():
+        papers = provider(store, respond)
+        original_json = papers.web.json
+
+        async def crossref_json(url, *, body=None):
+            if "api.crossref.org" not in url:
+                return await original_json(url, body=body)
+            crossref_requests.append(url)
+            if len(crossref_requests) == 1:
+                return {
+                    "message": {
+                        "items": [
+                            {"DOI": doi, "title": [f"Reference {number}"]}
+                            for number, doi in enumerate(dois[:20])
+                        ]
+                    }
+                }
+            await never_respond.wait()
+            raise AssertionError("released unexpectedly")
+
+        papers.web.json = crossref_json
+        seed = s2("a", "Seed", arxiv="2205.14135")
+        result = (await papers._primary_references([(0, seed)]))[0]
+        assert [paper["doi"] for paper in result["papers"]] == dois[:20]
+        assert result["coverage"]["returned"] == 20
+        assert result["coverage"]["unresolved"] == 1
+        assert len(result["evidence"]) == 20
+        assert any("timed out" in error for error in result["errors"])
+        assert len(crossref_requests) == 2
+        assert not papers.web.pending
+        await papers.web.close()
+
+    monkeypatch.setattr(papers_module, "PRIMARY_REFERENCE_SECONDS", 0.1)
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
 
 
 def test_primary_metadata_timeout_keeps_cached_doi_references(store, monkeypatch):
@@ -1134,3 +1538,78 @@ def test_resolve_many_enriches_only_missing_evidence_in_a_mixed_batch(store):
     run(exercise())
     assert len(requests) == 2
     assert not any("2401.00001" in request or "W1" in request for request in requests)
+
+
+def test_resolve_many_enriches_an_incomplete_s2_doi_with_crossref(store, monkeypatch):
+    requests = []
+
+    async def public_ip(_url):
+        return "93.184.216.34"
+
+    async def respond(request):
+        requests.append((request.headers["host"], request.url.path))
+        if request.headers["host"] == "api.semanticscholar.org":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "paperId": "a" * 40,
+                        "title": "Indexed title",
+                        "externalIds": {"DOI": "10.1000/incomplete"},
+                    }
+                ],
+            )
+        if request.headers["host"] == "api.openalex.org":
+            return httpx.Response(404)
+        if request.headers["host"] == "api.crossref.org":
+            return httpx.Response(
+                200,
+                json={
+                    "message": {
+                        "DOI": "10.1000/incomplete",
+                        "title": ["Deposited title"],
+                        "abstract": "<jats:p>Recovered evidence.</jats:p>",
+                    }
+                },
+            )
+        raise AssertionError(str(request.url))
+
+    async def exercise():
+        papers = provider(store, respond)
+        papers.web.attempts = 1
+        found = await papers.resolve_many(["10.1000/incomplete"])
+        assert len(found) == 1
+        assert found[0]["title"] == "Indexed title"
+        assert found[0]["abstract"] == "Recovered evidence."
+        assert found[0]["sources"] == ["semantic_scholar", "crossref"]
+        await papers.web.close()
+
+    monkeypatch.setattr("citation_lens.network.public_url", public_ip)
+    run(exercise())
+    assert [host for host, _ in requests].count("api.crossref.org") == 1
+
+
+def test_resolve_many_does_not_query_crossref_for_complete_index_metadata(store):
+    async def respond(request):
+        if request.headers["host"] == "api.semanticscholar.org":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "paperId": "a" * 40,
+                        "title": "Complete indexed title",
+                        "abstract": "Complete indexed abstract.",
+                        "externalIds": {"DOI": "10.1000/complete"},
+                    }
+                ],
+            )
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    async def exercise():
+        papers = provider(store, respond)
+        found = await papers.resolve_many(["10.1000/complete"])
+        assert found[0]["abstract"] == "Complete indexed abstract."
+        assert papers.web.requests == 1
+        await papers.web.close()
+
+    run(exercise())

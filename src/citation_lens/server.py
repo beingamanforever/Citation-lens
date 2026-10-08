@@ -90,7 +90,7 @@ async def research_expand(
     follow-up (cites the seeds, shares their references) and recent (last two years), plus
     citing->cited edges among the shown papers. query keeps the graph on topic. Each card's
     snippet is a verbatim abstract sentence, quotable as evidence. Backward expansion may
-    recover references with explicit arXiv IDs or cached DOI records from an arXiv primary
+    recover references with explicit arXiv IDs or exact DOI metadata from an arXiv primary
     bibliography when index lookup fails. Unresolved references and errors remain visible."""
     return reply(await graphs.expand(list(dict.fromkeys(seed_ids)), query, direction, limit))
 
@@ -113,6 +113,7 @@ async def research_read(
     """Read by DOI or doi.org URL; arXiv ID or abs URL; OpenAlex W-ID, OA:W... or URL;
     or Semantic Scholar 40-hex ID, S2:... or URL. Verified DOI/arXiv IDs from native discovery
     can be passed directly without another title search.
+    Crossref can fill missing DOI metadata; absent or unrenderable abstracts stay unavailable.
     part=abstract: abstracts and metadata for up to 30 papers
     (the first 1000 characters each when reading more than 3).
     part=outline: headings, offsets and figures. part=text: text from offset, max_chars <= 12000

@@ -1,0 +1,698 @@
+{
+  "purpose": "Fixed public capability checks, without inference or research-quality grading",
+  "base_commit": "daef5ae8c49ac98ca54cfcf9d8d27fe622d07f3c",
+  "conditions": {
+    "frozen_candidate_source": true,
+    "provider_keys": false,
+    "fresh_caches": true,
+    "http_counters": "cumulative within the MCP session; explicit Crossref batch has its own fresh cache"
+  },
+  "calls": [
+    {
+      "label": "initialize",
+      "tools": [
+        "research_search",
+        "research_expand",
+        "research_graph",
+        "research_read",
+        "research_visual"
+      ]
+    },
+    {
+      "label": "doi-read-1",
+      "tool": "research_read",
+      "arguments": {
+        "paper_id": "DOI:10.1037/0003-066x.59.1.29",
+        "part": "abstract"
+      },
+      "elapsed_seconds": 1.394,
+      "status": "returned",
+      "text_payload_bytes": 1148,
+      "http": {
+        "requests": 2,
+        "cache_hits": 0
+      },
+      "papers": 1,
+      "abstracts": 1,
+      "records": [
+        {
+          "id": "DOI:10.1037/0003-066x.59.1.29",
+          "title": "How the mind hurts and heals the body.",
+          "year": 2004,
+          "date": "2004-01-01",
+          "abstract_source": "openalex"
+        }
+      ],
+      "coverage": [],
+      "errors": []
+    },
+    {
+      "label": "doi-read-2",
+      "tool": "research_read",
+      "arguments": {
+        "paper_id": "DOI:10.1371/journal.pone.0000308",
+        "part": "abstract"
+      },
+      "elapsed_seconds": 0.701,
+      "status": "returned",
+      "text_payload_bytes": 1275,
+      "http": {
+        "requests": 3,
+        "cache_hits": 0
+      },
+      "papers": 1,
+      "abstracts": 1,
+      "records": [
+        {
+          "id": "DOI:10.1371/journal.pone.0000308",
+          "title": "Sharing Detailed Research Data Is Associated with Increased Citation Rate",
+          "year": 2007,
+          "date": "2007-03-21",
+          "abstract_source": "semantic_scholar"
+        }
+      ],
+      "coverage": [],
+      "errors": []
+    },
+    {
+      "label": "doi-read-3",
+      "tool": "research_read",
+      "arguments": {
+        "paper_id": "DOI:10.1038/nature12373",
+        "part": "abstract"
+      },
+      "elapsed_seconds": 0.618,
+      "status": "returned",
+      "text_payload_bytes": 1934,
+      "http": {
+        "requests": 4,
+        "cache_hits": 0
+      },
+      "papers": 1,
+      "abstracts": 1,
+      "records": [
+        {
+          "id": "ARXIV:1304.1068",
+          "title": "Nanometer scale thermometry in a living cell",
+          "year": 2013,
+          "date": "2013-04-03",
+          "abstract_source": "semantic_scholar"
+        }
+      ],
+      "coverage": [],
+      "errors": []
+    },
+    {
+      "label": "doi-repeat-1",
+      "tool": "research_read",
+      "arguments": {
+        "paper_id": "DOI:10.1037/0003-066x.59.1.29",
+        "part": "abstract"
+      },
+      "elapsed_seconds": 0.002,
+      "status": "returned",
+      "text_payload_bytes": 1148,
+      "http": {
+        "requests": 4,
+        "cache_hits": 0
+      },
+      "papers": 1,
+      "abstracts": 1,
+      "records": [
+        {
+          "id": "DOI:10.1037/0003-066x.59.1.29",
+          "title": "How the mind hurts and heals the body.",
+          "year": 2004,
+          "date": "2004-01-01",
+          "abstract_source": "openalex"
+        }
+      ],
+      "coverage": [],
+      "errors": []
+    },
+    {
+      "label": "doi-repeat-2",
+      "tool": "research_read",
+      "arguments": {
+        "paper_id": "DOI:10.1371/journal.pone.0000308",
+        "part": "abstract"
+      },
+      "elapsed_seconds": 0.001,
+      "status": "returned",
+      "text_payload_bytes": 1275,
+      "http": {
+        "requests": 4,
+        "cache_hits": 0
+      },
+      "papers": 1,
+      "abstracts": 1,
+      "records": [
+        {
+          "id": "DOI:10.1371/journal.pone.0000308",
+          "title": "Sharing Detailed Research Data Is Associated with Increased Citation Rate",
+          "year": 2007,
+          "date": "2007-03-21",
+          "abstract_source": "semantic_scholar"
+        }
+      ],
+      "coverage": [],
+      "errors": []
+    },
+    {
+      "label": "doi-repeat-3",
+      "tool": "research_read",
+      "arguments": {
+        "paper_id": "DOI:10.1038/nature12373",
+        "part": "abstract"
+      },
+      "elapsed_seconds": 0.001,
+      "status": "returned",
+      "text_payload_bytes": 1934,
+      "http": {
+        "requests": 4,
+        "cache_hits": 0
+      },
+      "papers": 1,
+      "abstracts": 1,
+      "records": [
+        {
+          "id": "ARXIV:1304.1068",
+          "title": "Nanometer scale thermometry in a living cell",
+          "year": 2013,
+          "date": "2013-04-03",
+          "abstract_source": "semantic_scholar"
+        }
+      ],
+      "coverage": [],
+      "errors": []
+    },
+    {
+      "label": "primary-backward",
+      "tool": "research_expand",
+      "arguments": {
+        "seed_ids": [
+          "ARXIV:2509.04739"
+        ],
+        "query": "cavity quantum electrodynamics localized modes",
+        "direction": "backward",
+        "limit": 5
+      },
+      "elapsed_seconds": 15.186,
+      "status": "returned",
+      "text_payload_bytes": 2925,
+      "http": {
+        "requests": 9,
+        "cache_hits": 0
+      },
+      "papers": 5,
+      "abstracts": 0,
+      "records": [
+        {
+          "id": "ARXIV:0806.4195",
+          "title": "The quantum internet",
+          "year": 2008,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1003.2525",
+          "title": "Cavity Quantum Electrodynamics with Anderson-Localized Modes",
+          "year": 2010,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1707.02046",
+          "title": "Microwave photonics with superconducting quantum circuits",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:2401.04949",
+          "title": "Quantum amplification and simulation of strong and ultrastrong coupling of light and matter",
+          "year": 2024,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1705.02433",
+          "title": "Light Interaction with Photonic and Plasmonic Resonances",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        }
+      ],
+      "coverage": [
+        {
+          "id": "ARXIV:2509.04739",
+          "cites": 9,
+          "reference_coverage": {
+            "source": "semantic_scholar",
+            "returned": 63
+          },
+          "references": 63
+        }
+      ],
+      "errors": []
+    },
+    {
+      "label": "local-graph",
+      "tool": "research_graph",
+      "arguments": {
+        "graph_id": "8e77f0cd0bf7",
+        "limit": 60
+      },
+      "elapsed_seconds": 0.004,
+      "status": "returned",
+      "text_payload_bytes": 22720,
+      "http": {
+        "requests": 9,
+        "cache_hits": 0
+      },
+      "papers": 48,
+      "abstracts": 0,
+      "records": [
+        {
+          "id": "ARXIV:0806.4195",
+          "title": "The quantum internet",
+          "year": 2008,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1003.2525",
+          "title": "Cavity Quantum Electrodynamics with Anderson-Localized Modes",
+          "year": 2010,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1707.02046",
+          "title": "Microwave photonics with superconducting quantum circuits",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:2401.04949",
+          "title": "Quantum amplification and simulation of strong and ultrastrong coupling of light and matter",
+          "year": 2024,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1705.02433",
+          "title": "Light Interaction with Photonic and Plasmonic Resonances",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1110.0573",
+          "title": "QuTiP: An open-source Python framework for the dynamics of open quantum systems",
+          "year": 2011,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1038/nature06234",
+          "title": "Controlling cavity reflectivity with a single quantum dot",
+          "year": 2007,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1709.09091",
+          "title": "Enhancing Cavity Quantum Electrodynamics via Antisqueezing: Synthetic Ultrastrong Coupling.",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1142/9789812386199_others06",
+          "title": "Quantum Optics",
+          "year": 2019,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1709.09555",
+          "title": "Exponentially Enhanced Light-Matter Interaction, Cooperativities, and Steady-State Entanglement Using Parametric Amplification.",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1412.2864",
+          "title": "Squeezed optomechanics with phase-matched amplification and dissipation.",
+          "year": 2014,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:quant-ph/0210039",
+          "title": "Optimal sizes of dielectric microspheres for cavity QED with strong coupling",
+          "year": 2002,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1107.4601",
+          "title": "Generalized effective mode volume for leaky optical cavities.",
+          "year": 2011,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1005.0067",
+          "title": "A fiber Fabry–Perot cavity with high finesse",
+          "year": 2010,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1103/physrevlett.118.223605",
+          "title": "Self-Similar Nanocavity Design with Ultrasmall Mode Volume for Single-Photon Nonlinearities.",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1608.01571",
+          "title": "Two-Photon Blockade in an Atom-Driven Cavity QED System.",
+          "year": 2016,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1910.05412",
+          "title": "Modeling electromagnetic resonators using quasinormal modes",
+          "year": 2019,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1212.4365",
+          "title": "Two-photon and three-photon blockades in driven nonlinear systems",
+          "year": 2012,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1038/s41377-019-0227-x",
+          "title": "Cooperative interactions between nano-antennas in a high-Q cavity for unidirectional light sources",
+          "year": 2019,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1611.02427",
+          "title": "Quantum sensing",
+          "year": 2016,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1804.09275",
+          "title": "Ultrastrong coupling regimes of light-matter interaction",
+          "year": 2018,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1206.2422",
+          "title": "Strongly enhanced light-matter interaction in a hybrid photonic-plasmonic resonator",
+          "year": 2012,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:0909.4777",
+          "title": "Quantum information with Rydberg atoms",
+          "year": 2009,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1002/9783527610075",
+          "title": "Quantum Theory of Optical Coherence",
+          "year": 2006,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1408.1357",
+          "title": "A small mode volume tunable microcavity: Development and characterization",
+          "year": 2014,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1408.3384",
+          "title": "All-optical coherent control of vacuum Rabi oscillations",
+          "year": 2014,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1207.4238",
+          "title": "Rydberg polaritons in a cavity: a superradiant solid.",
+          "year": 2012,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.29172/26ef5ca9-b059-4dbd-9ef3-00c8944a7e47",
+          "title": "Single Photon Sources",
+          "year": 2008,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1604.01599",
+          "title": "Localized Surface Plasmons Selectively Coupled to Resonant Light in Tubular Microcavities.",
+          "year": 2016,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1006.3633",
+          "title": "Cavity quantum electrodynamics with a Rydberg-blocked atomic ensemble",
+          "year": 2010,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1103/physrevlett.108.227402",
+          "title": "Low-photon-number optical switching with a single quantum dot coupled to a photonic crystal cavity.",
+          "year": 2012,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1103/physreva.55.1239",
+          "title": "Quantum structure and dynamics for atom galleries",
+          "year": 1997,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:1405.3473",
+          "title": "Coherent Polariton Dynamics in Coupled Highly Dissipative Cavities",
+          "year": 2014,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1126/science.1109815",
+          "title": "Deterministic Coupling of Single Quantum Dots to Single Nanocavity Modes",
+          "year": 2005,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1142/9789813237230_0006",
+          "title": "Quantum communication",
+          "year": 2018,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1007/978-3-319-77072-7_10",
+          "title": "Quantum computers",
+          "year": 1995,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:physics/0511153",
+          "title": "Cavity Q, mode volume, and lasing threshold in small diameter AlGaAs microdisks with embedded quantum dots.",
+          "year": 2005,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1038/s41567-020-0812-1",
+          "title": "From cavity to circuit quantum electrodynamics",
+          "year": 2020,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "ARXIV:0707.0268",
+          "title": "Quantum Imaging",
+          "year": 2007,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1038/s41586-019-1709-y",
+          "title": "A gated quantum dot strongly coupled to an optical microcavity",
+          "year": 2019,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1016/j.phpro.2010.01.047",
+          "title": "Phononic and photonic band gap structures: modelling and applications",
+          "year": 2010,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1364/ol.402781",
+          "title": "Hybrid photonic-plasmonic nano-cavity with ultra-high Q/V.",
+          "year": 2020,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "S2:f9c2301cc75ad70d4e76206cbf9dfc700d8a1e58",
+          "title": "Quantum Imaging and Information",
+          "year": 2011,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1063/1.4994056",
+          "title": "Ultra-high Q/V hybrid cavity for strong light-matter interaction",
+          "year": 2017,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1016/j.ijleo.2019.163896",
+          "title": "Cavity enhancement in nonlinear absorption and photoluminescence of BaTiO3",
+          "year": 2020,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1364/prj.7.000050",
+          "title": "High-Q, low-mode-volume microsphere-integrated Fabry–Perot cavity for optofluidic lasing applications",
+          "year": 2018,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1002/9781118337462.ch9",
+          "title": "Quantum Communication Networks",
+          "year": 2013,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "id": "DOI:10.1016/j.optmat.2019.109265",
+          "title": "Enhanced luminescence of europium in sol-gel derived BaTiO3/SiO2 multilayer cavity structure",
+          "year": 2019,
+          "date": null,
+          "abstract_source": null
+        }
+      ],
+      "coverage": [
+        {
+          "id": "ARXIV:2509.04739",
+          "cites": 9,
+          "reference_coverage": {
+            "source": "semantic_scholar",
+            "returned": 63
+          },
+          "references": 63
+        }
+      ],
+      "errors": []
+    },
+    {
+      "label": "primary-doi-node",
+      "tool": "research_read",
+      "arguments": {
+        "paper_id": "DOI:10.1038/nature06234",
+        "part": "abstract"
+      },
+      "elapsed_seconds": 1.824,
+      "status": "returned",
+      "text_payload_bytes": 450,
+      "http": {
+        "requests": 12,
+        "cache_hits": 0
+      },
+      "papers": 1,
+      "abstracts": 0,
+      "records": [
+        {
+          "id": "DOI:10.1038/nature06234",
+          "title": "Controlling cavity reflectivity with a single quantum dot",
+          "year": 2007,
+          "date": "2007-09-16",
+          "abstract_source": null
+        }
+      ],
+      "coverage": [],
+      "errors": []
+    },
+    {
+      "label": "explicit-crossref-batch",
+      "arguments": [
+        "DOI:10.1037/0003-066x.59.1.29",
+        "DOI:10.1371/journal.pone.0000308",
+        "DOI:10.1038/nature12373"
+      ],
+      "elapsed_seconds": 0.778,
+      "status": "returned",
+      "http": {
+        "requests": 1,
+        "cache_hits": 0
+      },
+      "papers": 3,
+      "abstracts": 0,
+      "records": [
+        {
+          "requested_id": "DOI:10.1037/0003-066x.59.1.29",
+          "id": "DOI:10.1037/0003-066x.59.1.29",
+          "title": "How the Mind Hurts and Heals the Body.",
+          "year": 2004,
+          "date": null,
+          "abstract_source": null
+        },
+        {
+          "requested_id": "DOI:10.1371/journal.pone.0000308",
+          "id": "DOI:10.1371/journal.pone.0000308",
+          "title": "Sharing Detailed Research Data Is Associated with Increased Citation Rate",
+          "year": 2007,
+          "date": "2007-03-21",
+          "abstract_source": null
+        },
+        {
+          "requested_id": "DOI:10.1038/nature12373",
+          "id": "DOI:10.1038/nature12373",
+          "title": "Nanometre-scale thermometry in a living cell",
+          "year": 2013,
+          "date": "2013-07-31",
+          "abstract_source": null
+        }
+      ],
+      "errors": {}
+    }
+  ]
+}

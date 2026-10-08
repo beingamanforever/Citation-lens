@@ -16,6 +16,7 @@ Give it a research question; it finds the defining papers, walks their citation 
    Shared downloads, provider deadlines and throttling pauses avoid repeated work and bound waits.
 4. **Cite real links.** Edges are citing -> cited pairs taken from reference lists.
    If citation indexes fail, arXiv bibliographies can supply backward links with a source fragment and matched paper ID; unresolved references remain visible.
+   Crossref can resolve exact DOI metadata for those links and missing-evidence reads; it supplies paper metadata while the bibliography remains the edge proof.
    Shared references and similarity never become citation links.
 
 The agent stays in charge of judgment: Lens gathers, ranks and previews; the agent screens, verifies and writes.
@@ -72,10 +73,11 @@ Three Codex timeouts lack token usage; token means exclude them.
 These are historical keyless measurements with model-based judges, from the packages recorded in each export.
 Inspected tasks become regression cases for future changes; new behavior needs fresh held-out evidence.
 Three later development candidates failed the saved quality and efficiency requirements.
-Version 0.2.1 ships separately verified correctness repairs; it has no demonstrated end-to-end performance gain.
+Version 0.2.2 ships separately verified correctness repairs, including exact DOI recovery; it has no demonstrated end-to-end performance gain.
 
 [Protocol, failures and reproduction](docs/EVALUATION.md) · [Codex evidence](docs/results/codex-heldout.json) · [Claude evidence](docs/results/claude-heldout.json)
 [Development comparisons](docs/DEVELOPMENT.md)
+[DOI recovery checks](docs/DOI_RECOVERY.md)
 
 [Design and research basis](docs/DESIGN.md) · [Privacy](docs/PRIVACY.md) ·
 [Development](docs/PUBLISHING.md) · [MIT license](LICENSE)

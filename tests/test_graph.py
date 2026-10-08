@@ -281,6 +281,8 @@ def test_expand_keeps_arxiv_primary_results_when_a_mixed_journal_seed_stalls(sto
                     b'<a href="https://doi.org/10.1000/cached">cached reference</a></li>'
                 ),
             )
+        if host == "api.crossref.org":
+            await never_respond.wait()
         raise AssertionError(str(request.url))
 
     async def exercise():

@@ -54,17 +54,21 @@ The answer's paper limit is a ceiling, not a quota.
 | Citing papers | Semantic Scholar (newest 1000), OpenAlex (most cited, overall and last two years) | S2 lists citers newest-first; OpenAlex sorts by citations |
 | Similar papers | Semantic Scholar recommendations | finds prominent follow-ups a newest-first citer list misses |
 | Coupling data | one Semantic Scholar batch of reference IDs for up to 400 candidates | measures shared references |
+| Missing DOI metadata | Crossref exact DOI lookup | fills missing fields without becoming citation proof |
 
 When both indexes lack a reference list, arXiv seeds can use explicit DOI/arXiv links inside individual HTML bibliography entries.
-Already cached records resolve immediately; one bounded arXiv metadata batch resolves additional preprints without repeating unavailable index queries.
-Uncached DOI-only entries remain unresolved.
+Already cached records resolve immediately; bounded arXiv and Crossref batches resolve additional preprints and DOI records without repeating unavailable index queries.
+Crossref fills missing metadata and publisher-deposited abstracts when available; it does not replace complete indexed or cached evidence.
+Abstracts containing notation that cannot be preserved as plain text remain unavailable, and incomplete publication dates remain incomplete.
 Each recovered edge carries its matched identifier and primary bibliography fragment; similar papers still do not become citation edges.
-The fallback inspects at most 100 entries per seed, hydrates at most 100 distinct uncached arXiv identifiers per expansion, and reports omitted, ambiguous and unresolved entries.
+The fallback inspects at most 100 entries per seed, hydrates at most 100 distinct uncached identifiers per expansion, alternating arXiv and DOI records when both are present, and reports omitted, ambiguous and unresolved entries.
+Crossref requests are serialized and paced within each plugin process; partial completed batches survive a later failure or deadline.
 Unavailable HTML is a visible gap, rather than evidence of an empty bibliography.
 Reference lookups allow eight seconds each for Semantic Scholar and OpenAlex, then twelve seconds for primary arXiv retrieval and metadata hydration, inside the existing thirty-second caller deadline.
 The common index bounds keep a stalled journal seed from blocking recovered arXiv neighbors.
 They reduce index patience for journal-only seeds; end-to-end development runs must measure that tradeoff.
 The tested development bundles failed the saved retention rule; primary-reference recovery is a verified capability, not evidence of an overall research gain.
+[Fixed live DOI checks](DOI_RECOVERY.md) retain missing abstracts and distinguish normal indexed resolution from the new fallback.
 
 Records merge on stable identifiers, or an exact long title with compatible author/year evidence and no conflicting identifiers.
 Two different arXiv IDs never merge.

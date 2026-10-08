@@ -8,15 +8,17 @@ merge on shared arXiv, DOI, provider or exact-title keys.
 import asyncio
 import re
 import xml.etree.ElementTree as ET
+from datetime import date as calendar_date
 from urllib.parse import quote, urlencode, urljoin
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment, NavigableString
 
 from .network import Web
 
 S2 = "https://api.semanticscholar.org/graph/v1"
 OA = "https://api.openalex.org/works"
 ARXIV = "https://export.arxiv.org/api/query"
+CROSSREF = "https://api.crossref.org/works"
 S2_FIELDS = (
     "paperId,externalIds,title,abstract,year,publicationDate,citationCount,venue,authors,"
     "openAccessPdf"
@@ -24,6 +26,9 @@ S2_FIELDS = (
 OA_FIELDS = (
     "id,doi,ids,title,publication_year,publication_date,cited_by_count,abstract_inverted_index,"
     "authorships,primary_location,best_oa_location,referenced_works"
+)
+CROSSREF_FIELDS = (
+    "DOI,title,author,container-title,abstract,published,published-online,published-print,issued"
 )
 ARXIV_ID = r"(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?/\d{7})"
 ATOM = {
@@ -70,6 +75,15 @@ def identifier(value: str) -> str:
 
 def arxiv_base(value: str) -> str:
     return re.sub(r"v\d+$", "", value or "")
+
+
+def _normalize_doi(value: str) -> str:
+    match = re.fullmatch(
+        r"(?i)(?:doi:|https?://(?:dx\.)?doi\.org/)?(10\.\d{4,9}/\S+)", value.strip()
+    )
+    if not match:
+        raise ValueError("Invalid DOI")
+    return match.group(1).lower()
 
 
 def keys(paper: dict) -> set[str]:
@@ -180,6 +194,132 @@ def from_openalex(raw: dict) -> dict:
     )
 
 
+def _crossref_date(raw: dict) -> tuple[int | None, str | None]:
+    for field in ("published", "published-online", "published-print", "issued"):
+        value = raw.get(field)
+        parts_list = value.get("date-parts") if isinstance(value, dict) else None
+        if not isinstance(parts_list, list):
+            continue
+        for parts in parts_list:
+            if not isinstance(parts, list) or not parts or len(parts) > 3:
+                continue
+            if any(not isinstance(value, int) or isinstance(value, bool) for value in parts):
+                continue
+            year = parts[0]
+            if not 1 <= year <= 9999:
+                continue
+            if len(parts) == 1:
+                return year, None
+            if not 1 <= parts[1] <= 12:
+                continue
+            if len(parts) == 2:
+                return year, None
+            try:
+                exact = calendar_date(year, parts[1], parts[2])
+            except ValueError:
+                continue
+            return year, exact.isoformat()
+    return None, None
+
+
+def _crossref_abstract(raw: dict) -> tuple[str, str | None]:
+    value = raw.get("abstract")
+    if not isinstance(value, str) or not value.strip():
+        return "", None
+    soup = BeautifulSoup(value, "html.parser")
+    unsafe = {
+        "disp-formula",
+        "formula",
+        "graphic",
+        "image",
+        "inline-formula",
+        "inline-graphic",
+        "math",
+        "sub",
+        "sup",
+        "svg",
+        "tex-math",
+    }
+    if any(tag.name and tag.name.rsplit(":", 1)[-1] in unsafe for tag in soup.find_all(True)):
+        return "", "abstract contains notation or media that cannot be preserved as plain evidence"
+    blocks = {
+        "abstract",
+        "ack",
+        "app",
+        "caption",
+        "def-item",
+        "disp-quote",
+        "fig",
+        "fn",
+        "list",
+        "list-item",
+        "notes",
+        "p",
+        "paragraph",
+        "ref",
+        "sec",
+        "statement",
+        "table-wrap",
+        "title",
+    }
+
+    def plain_text(node) -> str:
+        if isinstance(node, Comment):
+            return ""
+        if isinstance(node, NavigableString):
+            return re.sub(r"\s+", " ", str(node))
+        name = (node.name or "").rsplit(":", 1)[-1]
+        if name in {"br", "break"}:
+            return "\n"
+        text = "".join(plain_text(child) for child in node.children)
+        return "\n\n" + text + "\n\n" if name in blocks else text
+
+    text = "".join(plain_text(node) for node in soup.contents)
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip(), None
+
+
+def from_crossref(raw: dict) -> dict:
+    if not isinstance(raw, dict):
+        raise ValueError("Crossref work is not an object")
+    doi = _normalize_doi(str(raw.get("DOI") or ""))
+    titles = raw.get("title")
+    title = titles[0] if isinstance(titles, list) and titles else titles
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError(f"Crossref work {doi} has no title")
+    authors = []
+    raw_authors = raw.get("author")
+    for author in raw_authors if isinstance(raw_authors, list) else []:
+        if not isinstance(author, dict):
+            continue
+        supplied_name = author.get("name")
+        name = supplied_name.strip() if isinstance(supplied_name, str) else ""
+        name = name or " ".join(
+            value.strip()
+            for value in (author.get("given"), author.get("family"))
+            if isinstance(value, str) and value.strip()
+        )
+        if name:
+            authors.append(name)
+    venues = raw.get("container-title")
+    venue = venues[0] if isinstance(venues, list) and venues else venues
+    year, publication_date = _crossref_date(raw)
+    abstract, _ = _crossref_abstract(raw)
+    return _record(
+        title=title,
+        year=year,
+        date=publication_date,
+        authors=authors,
+        venue=venue if isinstance(venue, str) else "",
+        abstract=abstract,
+        abstract_source="crossref" if abstract else None,
+        doi=doi,
+        sources=["crossref"],
+    )
+
+
 def from_arxiv(data: bytes) -> tuple[list[dict], int]:
     root = ET.fromstring(data)
     papers = []
@@ -207,7 +347,7 @@ def from_arxiv(data: bytes) -> tuple[list[dict], int]:
 
 def _combine(first: dict, second: dict) -> dict:
     """Merge two records of one work; arXiv text is primary, the larger citation count wins."""
-    rank = {"arxiv": 0, "semantic_scholar": 1, "openalex": 2}
+    rank = {"arxiv": 0, "semantic_scholar": 1, "openalex": 2, "crossref": 3}
     a, b = sorted((first, second), key=lambda p: min(rank[s] for s in p["sources"]))
     merged = dict(a)
     merged["title"] = a["title"] if a["title"].strip() else b["title"]
@@ -216,13 +356,21 @@ def _combine(first: dict, second: dict) -> dict:
     abstract = a if a["abstract"].strip() else b
     merged["abstract"] = abstract["abstract"]
     merged["abstract_source"] = abstract.get("abstract_source")
-    merged["authors"] = max(a["authors"], b["authors"], key=len)
-    merged["citations"] = max(
-        (p["citations"] for p in (a, b) if p["citations"] is not None), default=None
-    )
-    dates = [p["date"] for p in (a, b) if p["date"]]
-    merged["date"] = min(dates) if dates else None
-    merged["year"] = min(y for y in (a["year"], b["year"]) if y) if a["year"] or b["year"] else None
+    if set(b["sources"]) == {"crossref"} and set(a["sources"]) != {"crossref"}:
+        merged["authors"] = a["authors"] or b["authors"]
+        merged["citations"] = a["citations"]
+        merged["date"] = a["date"] or b["date"]
+        merged["year"] = a["year"] or b["year"]
+    else:
+        merged["authors"] = max(a["authors"], b["authors"], key=len)
+        merged["citations"] = max(
+            (p["citations"] for p in (a, b) if p["citations"] is not None), default=None
+        )
+        dates = [p["date"] for p in (a, b) if p["date"]]
+        merged["date"] = min(dates) if dates else None
+        merged["year"] = (
+            min(y for y in (a["year"], b["year"]) if y) if a["year"] or b["year"] else None
+        )
     merged["refs"] = list(dict.fromkeys(a["refs"] + b["refs"]))
     merged["sources"] = list(dict.fromkeys(a["sources"] + b["sources"]))
     return _record(**{k: v for k, v in merged.items() if k not in ("id", "url")})
@@ -345,13 +493,22 @@ class Papers:
         """Batch-resolve IDs; unresolved IDs are omitted. One S2 request covers up to 500."""
         wanted = [identifier(value) for value in paper_ids]
         cached = {value: self.cached(value) for value in wanted}
-        missing = [
-            value
-            for value in wanted
-            if not ((cached[value] or {}).get("title") or "").strip()
-            or not ((cached[value] or {}).get("abstract") or "").strip()
-        ]
-        found: dict[str, dict] = {}
+
+        def complete(paper: dict | None) -> bool:
+            return bool(
+                paper
+                and (paper.get("title") or "").strip()
+                and (paper.get("abstract") or "").strip()
+            )
+
+        missing = [value for value in wanted if not complete(cached[value])]
+        records = {value: [cached[value]] if cached[value] else [] for value in wanted}
+        changed = set()
+
+        def current(value: str) -> dict | None:
+            known = records[value]
+            return merge(known)[0][0] if len(known) > 1 else known[0] if known else None
+
         if missing:
             s2_targets = []
             for value in missing:
@@ -378,20 +535,48 @@ class Papers:
                         if row:
                             paper = from_s2(row)
                             if _matches(paper, identifier(ref)):
-                                found[value] = paper
+                                records[value].append(paper)
+                                changed.add(value)
                 except (RuntimeError, ValueError, TimeoutError):
                     pass  # OpenAlex and arXiv below are independent fallbacks.
-            rest = [value for value in missing if value not in found]
-            for paper in await self._fallback(rest):
-                for value in rest:
-                    if _matches(paper, value):
-                        found[value] = paper
+
+            fallback_targets = {}
+            for value in missing:
+                paper = current(value)
+                if complete(paper):
+                    continue
+                if paper and paper["oa"]:
+                    fallback_targets[value] = "OA:" + paper["oa"]
+                elif paper and paper["doi"]:
+                    fallback_targets[value] = "DOI:" + paper["doi"]
+                elif paper and paper["arxiv"]:
+                    fallback_targets[value] = "ARXIV:" + arxiv_base(paper["arxiv"])
+                else:
+                    fallback_targets[value] = value
+            for paper in await self._fallback(list(dict.fromkeys(fallback_targets.values()))):
+                for value, lookup in fallback_targets.items():
+                    if _matches(paper, lookup):
+                        records[value].append(paper)
+                        changed.add(value)
+
+            crossref_targets: dict[str, list[str]] = {}
+            for value in missing:
+                paper = current(value)
+                if complete(paper):
+                    continue
+                doi = value[4:] if value.startswith("DOI:") else (paper or {}).get("doi")
+                if doi:
+                    crossref_targets.setdefault("DOI:" + _normalize_doi(doi), []).append(value)
+            if crossref_targets:
+                crossref, _ = await self._crossref_batch(list(crossref_targets))
+                for doi_id, paper in crossref.items():
+                    for value in crossref_targets[doi_id]:
+                        records[value].append(paper)
+                        changed.add(value)
         result = []
         for value in wanted:
-            known = [p for p in (cached[value], found.get(value)) if p]
-            if known:
-                paper = merge(known)[0][0] if len(known) > 1 else known[0]
-                result.append(self.remember(paper) if value in found else paper)
+            if paper := current(value):
+                result.append(self.remember(paper) if value in changed else paper)
         return result
 
     async def _fallback(self, values: list[str]) -> list[dict]:
@@ -423,6 +608,112 @@ class Papers:
             return []
         params = {"id_list": ",".join(ids), "max_results": len(ids)}
         return from_arxiv(await self.web.fetch(f"{ARXIV}?{urlencode(params)}"))[0]
+
+    async def _crossref_batch(
+        self, doi_ids: list[str], seconds: float = REFERENCE_PROVIDER_SECONDS
+    ) -> tuple[dict[str, dict], dict[str, str]]:
+        ids = list(dict.fromkeys("DOI:" + _normalize_doi(value) for value in doi_ids))
+        selected, omitted = ids[:PRIMARY_HYDRATION_LIMIT], ids[PRIMARY_HYDRATION_LIMIT:]
+        errors = {doi: "Crossref: DOI exceeds the 100-work metadata cap" for doi in omitted}
+
+        def list_url(batch: list[str]) -> str:
+            params = {
+                "filter": ",".join("doi:" + doi_id[4:] for doi_id in batch),
+                "rows": len(batch),
+                "select": CROSSREF_FIELDS,
+            }
+            return CROSSREF + "?" + urlencode(params)
+
+        jobs: list[tuple[list[str], str, bool]] = []
+
+        def add(batch: list[str]):
+            if not batch:
+                return
+            if len(batch) == 1:
+                url = CROSSREF + "/" + quote(batch[0][4:], safe="")
+                if len(url.encode()) > 6000:
+                    errors[batch[0]] = "Crossref: DOI is too long for the 6000-byte URL limit"
+                    return
+                jobs.append((batch, url, True))
+            else:
+                jobs.append((batch, list_url(batch), False))
+
+        batch: list[str] = []
+        for doi in selected:
+            if "," in doi[4:]:
+                add(batch)
+                batch = []
+                add([doi])
+                continue
+            candidate = batch + [doi]
+            if len(candidate) > 20 or len(list_url(candidate).encode()) > 6000:
+                add(batch)
+                batch = [doi]
+            else:
+                batch = candidate
+        add(batch)
+
+        found: dict[str, dict] = {}
+        deadline = asyncio.get_running_loop().time() + max(0, seconds)
+        for position, (requested, url, singleton) in enumerate(jobs):
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                for later, _, _ in jobs[position:]:
+                    for doi in later:
+                        errors.setdefault(doi, "Crossref: metadata lookup timed out")
+                break
+            try:
+                payload = await asyncio.wait_for(self.web.json(url), remaining)
+            except TimeoutError:
+                for later, _, _ in jobs[position:]:
+                    for doi in later:
+                        errors.setdefault(doi, "Crossref: metadata lookup timed out")
+                break
+            except (RuntimeError, ValueError) as error:
+                for doi in requested:
+                    errors.setdefault(doi, _provider_error("Crossref", error))
+                continue
+
+            message = payload.get("message") if isinstance(payload, dict) else None
+            rows = [message] if singleton and isinstance(message, dict) else None
+            if (
+                not singleton
+                and isinstance(message, dict)
+                and isinstance(message.get("items"), list)
+            ):
+                rows = message["items"]
+            if rows is None:
+                for doi in requested:
+                    errors.setdefault(doi, "Crossref: malformed metadata response")
+                continue
+
+            requested_set = set(requested)
+            for raw in rows:
+                if not isinstance(raw, dict):
+                    continue
+                try:
+                    doi = "DOI:" + _normalize_doi(str(raw.get("DOI") or ""))
+                except ValueError:
+                    continue
+                if doi not in requested_set or doi in found:
+                    continue
+                try:
+                    paper = from_crossref(raw)
+                except ValueError as error:
+                    errors.setdefault(doi, _provider_error("Crossref", error))
+                    continue
+                found[doi] = paper
+                _, diagnostic = _crossref_abstract(raw)
+                if diagnostic:
+                    errors.setdefault(doi, _provider_error("Crossref", ValueError(diagnostic)))
+            for doi in requested:
+                if doi not in found and doi not in errors:
+                    errors[doi] = "Crossref: no exact metadata for DOI"
+
+        return (
+            {doi: found[doi] for doi in selected if doi in found},
+            {doi: errors[doi] for doi in ids if doi in errors},
+        )
 
     async def search(
         self, query: str, provider: str, limit: int, since: str | None = None, newest: bool = False
@@ -697,9 +988,9 @@ class Papers:
             index = tasks[task]
             recovered[index]["errors"].append("arXiv primary: bibliography lookup timed out")
 
-        unresolved_by_seed: dict[int, list[str]] = {}
+        unresolved_by_seed: dict[int, dict[str, list[str]]] = {}
         for index, items in items_by_seed.items():
-            unresolved_by_seed[index] = list(
+            arxiv_ids = list(
                 dict.fromkeys(
                     paper_id[6:]
                     for item in items
@@ -707,45 +998,121 @@ class Papers:
                     if paper_id.startswith("ARXIV:") and not self.cached(paper_id)
                 )
             )
-        selected, selected_set, position = [], set(), 0
+            doi_ids = list(
+                dict.fromkeys(
+                    paper_id[4:]
+                    for item in items
+                    for paper_id in item["ids"]
+                    if paper_id.startswith("DOI:")
+                    and (
+                        not (paper := self.cached(paper_id))
+                        or not (paper.get("title") or "").strip()
+                        or not (paper.get("abstract") or "").strip()
+                    )
+                )
+            )
+            unresolved_by_seed[index] = {"arxiv": arxiv_ids, "doi": doi_ids}
+        selected: list[tuple[str, str]] = []
+        selected_set: set[tuple[str, str]] = set()
+        position = 0
         while len(selected) < PRIMARY_HYDRATION_LIMIT:
             had_candidate = False
             for index, _ in seeds:
-                queue = unresolved_by_seed.get(index, [])
-                if position >= len(queue):
-                    continue
-                had_candidate = True
-                arxiv_id = queue[position]
-                if arxiv_id not in selected_set:
-                    selected.append(arxiv_id)
-                    selected_set.add(arxiv_id)
-                    if len(selected) == PRIMARY_HYDRATION_LIMIT:
-                        break
+                for kind in ("arxiv", "doi"):
+                    queue = unresolved_by_seed.get(index, {}).get(kind, [])
+                    if position >= len(queue):
+                        continue
+                    had_candidate = True
+                    candidate = (kind, queue[position])
+                    if candidate not in selected_set:
+                        selected.append(candidate)
+                        selected_set.add(candidate)
+                        if len(selected) == PRIMARY_HYDRATION_LIMIT:
+                            break
+                if len(selected) == PRIMARY_HYDRATION_LIMIT:
+                    break
             if not had_candidate:
                 break
             position += 1
-        for index, queue in unresolved_by_seed.items():
-            omitted = len({paper_id for paper_id in queue if paper_id not in selected_set})
+        for index, queues in unresolved_by_seed.items():
+            omitted = len(
+                {
+                    (kind, paper_id)
+                    for kind, queue in queues.items()
+                    for paper_id in queue
+                    if (kind, paper_id) not in selected_set
+                }
+            )
             if omitted:
                 recovered[index]["coverage"]["metadata_truncated"] = omitted
                 recovered[index]["errors"].append(
-                    f"arXiv primary: {omitted} uncached arXiv reference(s) exceed metadata cap"
+                    f"arXiv primary: {omitted} uncached/incomplete reference(s) exceed metadata cap"
                 )
 
         if selected:
+            arxiv_selected = [paper_id for kind, paper_id in selected if kind == "arxiv"]
+            doi_selected = [paper_id for kind, paper_id in selected if kind == "doi"]
+            remaining = max(0, deadline - asyncio.get_running_loop().time())
+            hydration_tasks = {}
+            if arxiv_selected:
+                hydration_tasks[
+                    asyncio.create_task(
+                        asyncio.wait_for(self._arxiv_batch(arxiv_selected), remaining)
+                    )
+                ] = "arXiv"
+            if doi_selected:
+                hydration_tasks[
+                    asyncio.create_task(self._crossref_batch(doi_selected, seconds=remaining))
+                ] = "Crossref"
             try:
-                hydrated = await asyncio.wait_for(
-                    self._arxiv_batch(selected),
-                    max(0, deadline - asyncio.get_running_loop().time()),
+                await asyncio.gather(*hydration_tasks, return_exceptions=True)
+            except BaseException:
+                for task in hydration_tasks:
+                    task.cancel()
+                await asyncio.gather(*hydration_tasks, return_exceptions=True)
+                raise
+
+            hydrated_arxiv = []
+            hydrated_crossref: dict[str, dict] = {}
+            crossref_errors: dict[str, str] = {}
+            for task in hydration_tasks:
+                provider = hydration_tasks[task]
+                try:
+                    value = task.result()
+                except (RuntimeError, ValueError, TimeoutError, ET.ParseError) as error:
+                    message = (
+                        f"{provider} metadata: lookup timed out"
+                        if isinstance(error, TimeoutError)
+                        else _provider_error(provider + " metadata", error)
+                    )
+                    kind = "arxiv" if provider == "arXiv" else "doi"
+                    for index, queues in unresolved_by_seed.items():
+                        if any((kind, paper_id) in selected_set for paper_id in queues[kind]):
+                            recovered[index]["errors"].append(message)
+                else:
+                    if provider == "arXiv":
+                        hydrated_arxiv = value
+                    else:
+                        hydrated_crossref, crossref_errors = value
+
+            for paper in hydrated_arxiv:
+                self.remember(paper)
+            for doi_id, paper in hydrated_crossref.items():
+                known = self.cached(doi_id)
+                self.remember(_combine(known, paper) if known else paper)
+            for index, queues in unresolved_by_seed.items():
+                messages = list(
+                    dict.fromkeys(
+                        crossref_errors["DOI:" + doi]
+                        for doi in queues["doi"]
+                        if ("doi", doi) in selected_set and "DOI:" + doi in crossref_errors
+                    )
                 )
-            except (RuntimeError, ValueError, TimeoutError, ET.ParseError) as error:
-                message = _provider_error("arXiv metadata", error)
-                for index, queue in unresolved_by_seed.items():
-                    if any(paper_id in selected_set for paper_id in queue):
-                        recovered[index]["errors"].append(message)
-            else:
-                for paper in hydrated:
-                    self.remember(paper)
+                recovered[index]["errors"] += [compact(message) for message in messages[:3]]
+                if len(messages) > 3:
+                    recovered[index]["errors"].append(
+                        f"Crossref metadata: {len(messages) - 3} more diagnostic(s) omitted"
+                    )
 
         for index, items in items_by_seed.items():
             seen = set()

@@ -2,8 +2,10 @@
 
 Citation Lens has no telemetry, accounts, remote storage or embedded model API.
 Queries and selected paper identifiers go to the requested scholarly provider:
-OpenAlex, Semantic Scholar or arXiv. Paper text/images are fetched from their
-indexed public source. Jina Reader is contacted only for an explicitly configured
+OpenAlex, Semantic Scholar or arXiv.
+Crossref receives exact DOI identifiers when indexed evidence is missing or primary bibliography records need metadata.
+It receives no keyword research queries.
+Paper text/images are fetched from their indexed public source. Jina Reader is contacted only for an explicitly configured
 fallback and receives the selected PDF URL. Third-party terms and usage limits
 apply. Avoid putting confidential information into research queries.
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "citation-lens"
-version = "0.2.1"
+version = "0.2.2"
 description = "Search papers, follow citations and read the evidence."
 readme = "README.md"
 requires-python = ">=3.11"
