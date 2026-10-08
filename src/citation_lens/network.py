@@ -122,9 +122,11 @@ class Web:
                         attempt_slot = self.crossref_slot if is_crossref else nullcontext()
                         async with attempt_slot:
                             async with self.locks.setdefault(host, asyncio.Lock()):
-                                await asyncio.sleep(
-                                    max(0, self.next_at.get(host, 0) - time.monotonic())
-                                )
+                                # Coarse timers can wake early; recheck before issuing traffic.
+                                while (  # noqa: ASYNC110 - a clock deadline has no event to await
+                                    pacing_wait := self.next_at.get(host, 0) - time.monotonic()
+                                ) > 0:
+                                    await asyncio.sleep(pacing_wait)
                                 if not is_crossref:
                                     self.next_at[host] = time.monotonic() + interval
                             request_url, request_headers, extensions = url, dict(headers), {}

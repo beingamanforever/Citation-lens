@@ -1,12 +1,14 @@
 import asyncio
 import json
 import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
 from conftest import run
 
+from citation_lens import network
 from citation_lens.graph import payload
 from citation_lens.network import Web, public_url
 from citation_lens.storage import Store
@@ -88,6 +90,39 @@ def test_crossref_serializes_and_spaces_distinct_requests(store):
             assert await asyncio.gather(first, second) == [b"ok", b"second"]
         assert starts[1] - starts[0] >= 1.05
         await web.close()
+
+    run(exercise())
+
+
+@pytest.mark.parametrize("host,interval", [("api.crossref.org", 1.05), ("export.arxiv.org", 3.05)])
+def test_provider_pacing_rechecks_clock_after_early_wakeup(store, monkeypatch, host, interval):
+    current_time = 0.0
+    starts = []
+    sleeps = []
+
+    async def early_sleep(delay):
+        nonlocal current_time
+        if delay <= 0:
+            return
+        sleeps.append(delay)
+        current_time += delay / 2 if len(sleeps) == 1 else delay
+
+    async def respond(request):
+        starts.append(current_time)
+        return httpx.Response(200, content=b"ok")
+
+    async def exercise():
+        monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: current_time))
+        monkeypatch.setattr(network.asyncio, "sleep", early_sleep)
+        monkeypatch.setattr(network, "public_url", AsyncMock(return_value="8.8.8.8"))
+        web = Web(store, httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+        try:
+            assert await web.fetch(f"https://{host}/first") == b"ok"
+            assert await web.fetch(f"https://{host}/second") == b"ok"
+            assert starts[1] - starts[0] >= interval
+            assert len(sleeps) == 2
+        finally:
+            await web.close()
 
     run(exercise())
 

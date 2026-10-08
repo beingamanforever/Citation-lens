@@ -41,6 +41,7 @@ Raw responses and the frozen source remain in the local capability archive; pape
 Real MCP tests cover exact DOI reads after index failures, DOI-only bibliography recovery with the original source fragment, local graph and abstract reuse, and unavailable unsafe abstracts.
 An MCP timeout regression retains 20 completed DOI records and their primary bibliography proofs while a later record times out, with the gap still reported.
 Provider tests cover unordered identity matching, malformed records, shared hydration limits, partial results, cancellation and Crossref request serialization.
+Windows CI exposed an early timer wakeup that shortened request spacing; pacing now rechecks its deadline, with the original spacing assertion retained and a deterministic regression for Crossref and arXiv.
 The five public tools and default keyword providers are unchanged.
 
 Crossref metadata does not prove a citation edge, supply forward citation discovery or guarantee full text.
