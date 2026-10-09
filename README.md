@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/beingamanforever/Citation-lens/blob/main/video/citation-lens.mp4"><img src="video/poster.png" alt="Play the 47-second Citation Lens explainer" width="860"></a>
+  <a href="https://cdn.jsdelivr.net/gh/beingamanforever/Citation-lens@main/video/citation-lens.mp4"><img src="video/poster.png" alt="Play the 47-second Citation Lens explainer" width="860"></a>
 </p>
 
 ## Why Citation Lens
