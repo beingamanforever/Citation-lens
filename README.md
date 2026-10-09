@@ -1,4 +1,31 @@
-# Citation Lens
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo-light.svg" alt="Citation Lens" width="440">
+  </picture>
+</p>
+
+<h3 align="center">Web search finds pages. Research needs a graph.</h3>
+
+<p align="center">
+  Literature research for your coding agent: a citation graph with verified links, for Codex and Claude Code.
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#see-it-work">Watch</a> ·
+  <a href="demo/index.html">Side-by-side demo</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="#results">Results</a>
+</p>
+
+<p align="center">
+  <video src="https://github.com/beingamanforever/Citation-lens/raw/main/video/citation-lens.mp4" poster="video/poster.png" controls muted width="860">
+    <a href="video/citation-lens.mp4"><img src="video/poster.png" alt="Citation Lens in 47 seconds" width="860"></a>
+  </video>
+</p>
+
+<p align="center"><sub>47 seconds, with voice-over. <a href="video/citation-lens.mp4">Open the video file</a> if it does not play here.</sub></p>
 
 A literature-research plugin for Codex and Claude Code.
 Give it a research question; it finds the defining papers, walks their citation graph forward and backward like [Connected Papers](https://www.connectedpapers.com/about), surfaces the newest preprints, and hands the agent compact previews it can verify and cite.
@@ -20,6 +47,24 @@ Give it a research question; it finds the defining papers, walks their citation 
    Shared references and similarity never become citation links.
 
 The agent stays in charge of judgment: Lens gathers, ranks and previews; the agent screens, verifies and writes.
+
+## See it work
+
+Frames from the video, from one recorded Claude Code run on "What's new in linear-time sequence modeling?"
+
+| 1. Search wide | 2. Pick seeds |
+| :---: | :---: |
+| ![One call fans every query variant out to Semantic Scholar, OpenAlex and arXiv](assets/screens/search.png) | ![The agent picks the seed papers; Lens only gathers](assets/screens/seeds.png) |
+| **3. Walk the graph** | **4. Verify links** |
+| ![Seeds in the middle, foundations on the left, follow-ups on the right, recent work on top](assets/screens/graph.png) | ![A claimed link is confirmed in the paper's own reference list](assets/screens/verify.png) |
+
+**5. Compare.** The same agent with and without Citation Lens.
+In this run verified links went from 7 to 23 and tool calls from 8 to 5, at the cost of 30 more seconds.
+Across all 18 paired runs Lens verified more links in 13 and fewer in 4; the overall judge still preferred Claude alone, see [Results](#results).
+
+![Claude Code alone against Claude Code with Citation Lens](assets/screens/compare.png)
+
+Open [`demo/index.html`](demo/index.html) for a side-by-side replay of recorded runs, or read the [architecture diagrams](docs/ARCHITECTURE.md) for the whole system, a typical session and what `research_expand` does.
 Verified DOI or arXiv IDs found through native search can go straight to reading, without another title search.
 
 ## Install
