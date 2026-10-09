@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Citation Lens">
+  <defs><marker id="a" markerUnits="userSpaceOnUse" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0.5 10 5 0 9.5z" fill="#2a78d6"/></marker></defs>
+  <g stroke="#2a78d6" stroke-width="1.7" stroke-linecap="round"><line x1="47.4" y1="49.6" x2="34.7" y2="41.1" marker-end="url(#a)"/><line x1="47.4" y1="58.4" x2="34.7" y2="66.9" marker-end="url(#a)"/><line x1="73.0" y1="41.3" x2="60.2" y2="49.8" marker-end="url(#a)"/><line x1="73.0" y1="66.7" x2="60.2" y2="58.2" marker-end="url(#a)"/><line x1="54.0" y1="27.0" x2="54.0" y2="46.5" marker-end="url(#a)"/></g>
+  <circle cx="30" cy="38" r="4.6" fill="#2a78d6"/><circle cx="30" cy="70" r="4.6" fill="#2a78d6"/><circle cx="78" cy="38" r="4.6" fill="#2a78d6"/><circle cx="78" cy="70" r="4.6" fill="#2a78d6"/>
+  <circle cx="54" cy="22" r="3.6" fill="none" stroke="#2a78d6" stroke-width="1.8"/>
+  <circle cx="54" cy="54" r="6.5" fill="#e8622c"/>
+  <circle cx="54" cy="54" r="40" fill="none" stroke="#2a78d6" stroke-width="7"/>
+  <line x1="83" y1="83" x2="112" y2="112" stroke="#2a78d6" stroke-width="11" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Citation Lens</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Ccircle cx='54' cy='54' r='40' fill='none' stroke='%232a78d6' stroke-width='9'/%3E%3Cline x1='83' y1='83' x2='112' y2='112' stroke='%232a78d6' stroke-width='12' stroke-linecap='round'/%3E%3Ccircle cx='54' cy='54' r='9' fill='%23e8622c'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,650&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, then a wide stage for the side-by-side replay. Blue is always Citation Lens; slate is always the agent's own search; orange marks the seed paper. */
+:root {
+  --bg: #f5f6f8; --surface: #fcfcfb; --ink: #15202b; --muted: #56616d; --rule: #dde2e8; --chip: #e9eef5;
+  --lens: #2a78d6; --lens-soft: #e3eefb; --native: #5d6773; --native-soft: #eceef1; --seed: #e8622c;
+  --good: #0f7a4f; --bad: #b4381c; --bad-soft: #fbe9e4;
+  --display: "Literata", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1418; --surface: #171d23; --ink: #eef1f4; --muted: #a6b0ba; --rule: #29323a; --chip: #212a33;
+    --lens: #3987e5; --lens-soft: #16283d; --native: #98a2ad; --native-soft: #20272e; --seed: #f0703a;
+    --good: #4cc38a; --bad: #f08a6a; --bad-soft: #35211c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1418; --surface: #171d23; --ink: #eef1f4; --muted: #a6b0ba; --rule: #29323a; --chip: #212a33;
+  --lens: #3987e5; --lens-soft: #16283d; --native: #98a2ad; --native-soft: #20272e; --seed: #f0703a;
+  --good: #4cc38a; --bad: #f08a6a; --bad-soft: #35211c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); }
+a { color: var(--lens); }
+h1, h2, h3 { font-family: var(--display); font-weight: 650; text-wrap: balance; margin: 0; }
+h2 { font-size: 26px; line-height: 1.2; }
+h3 { font-size: 17px; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: 13px; }
+code { background: var(--chip); padding: 1px 6px; border-radius: 4px; word-break: break-word; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; }
+.read { max-width: 70ch; }
+section { padding-block: 56px 0; display: grid; gap: 22px; }
+
+/* hero */
+.hero { padding-block: 56px 8px; display: grid; gap: 22px; }
+.brand { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.brand svg { width: 92px; height: 92px; flex: none; }
+.brand h1 { font-size: clamp(38px, 6vw, 58px); line-height: 1.05; letter-spacing: -.02em; }
+.tag { font-size: 19px; color: var(--muted); max-width: 52ch; }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { background: var(--chip); border-radius: 999px; padding: 5px 13px; font-size: 13px; }
+
+/* how it works */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.step { background: var(--surface); border: 1px solid var(--rule); border-top: 3px solid var(--lens); border-radius: 8px; padding: 16px 16px 18px; display: grid; gap: 6px; align-content: start; }
+.step .k { font: 500 12px var(--mono); color: var(--lens); letter-spacing: .04em; }
+.step p { color: var(--muted); font-size: 14px; }
+.lanes { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: grid; gap: 14px; }
+.lanes svg { width: 100%; height: auto; max-height: 340px; }
+.lanes svg text { fill: var(--ink); font: 500 13px var(--body); }
+.lanes svg .sub { fill: var(--muted); font-size: 12px; font-weight: 400; }
+.legend3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 14px; color: var(--muted); }
+.legend3 b { color: var(--ink); }
+
+/* demo stage */
+.stage-head { display: grid; gap: 14px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+select, button { font: 500 14px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+button.primary { background: var(--lens); border-color: var(--lens); color: #fff; }
+button:hover, select:hover { border-color: var(--lens); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--lens); outline-offset: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: var(--surface); }
+.seg button[aria-pressed="true"] { background: var(--lens-soft); color: var(--lens); }
+.prompt { background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--seed); border-radius: 6px; padding: 12px 16px; font-size: 14px; color: var(--muted); max-width: 100ch; }
+.prompt b { color: var(--ink); }
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; min-width: 0; }
+.panel[data-side="lens"] { border-color: var(--lens); }
+.ph { padding: 12px 16px; display: grid; gap: 8px; border-bottom: 1px solid var(--rule); }
+.panel[data-side="lens"] .ph { background: var(--lens-soft); }
+.panel[data-side="web"] .ph { background: var(--native-soft); }
+.ph h3 { font: 600 15px var(--body); }
+.ph h3 small { font-weight: 400; color: var(--muted); }
+.stats { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.stats b { font: 500 16px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.log { padding: 12px; display: grid; gap: 10px; min-height: 340px; max-height: 640px; overflow-y: auto; align-content: start; }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 4px; }
+.call { border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; animation: rise .25s ease-out; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.call.failed { border-color: var(--bad); background: var(--bad-soft); }
+.call-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.badge { font: 500 12px var(--mono); padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.badge.web { background: var(--native-soft); color: var(--native); }
+.badge.lens { background: var(--lens-soft); color: var(--lens); }
+.qtext { font: 13px/1.45 var(--mono); color: var(--ink); overflow-wrap: anywhere; flex: 1 1 200px; }
+.running { color: var(--muted); font-size: 13px; }
+.running::after { content: ""; display: inline-block; width: 1.4em; text-align: left; animation: dots 1s steps(4) infinite; }
+@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+.res { display: grid; gap: 6px; font-size: 13px; }
+.sum { color: var(--muted); }
+.sum b { color: var(--ink); font-weight: 600; }
+.warn { color: var(--bad); font-size: 13px; overflow-wrap: anywhere; }
+.links, .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.links li { padding-left: 14px; position: relative; color: var(--ink); line-height: 1.4; }
+.links li::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--native); }
+.cards li { display: grid; gap: 2px; padding: 6px 8px; background: var(--bg); border-radius: 6px; border-left: 3px solid var(--lens); }
+.cards li.foundation { border-left-color: #8a63d2; }
+.cards li.follow-up { border-left-color: var(--lens); }
+.cards li.recent { border-left-color: var(--seed); }
+.ctitle { font-weight: 500; line-height: 1.35; }
+.cmeta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+.lane { font: 500 11px var(--mono); padding: 1px 6px; border-radius: 3px; background: var(--chip); }
+.lane.foundation { color: #8a63d2; } .lane.follow-up { color: var(--lens); } .lane.recent { color: var(--seed); }
+.why { font-style: italic; }
+.final { border: 1px dashed var(--rule); border-radius: 8px; padding: 12px; display: grid; gap: 4px; font-size: 14px; animation: rise .25s ease-out; }
+.final b { font-family: var(--mono); }
+.note { font-size: 13px; color: var(--muted); max-width: 100ch; }
+
+/* results */
+.results { display: grid; gap: 22px; }
+.verdict { font-family: var(--display); font-size: 22px; line-height: 1.3; max-width: 36em; text-wrap: balance; }
+.bars { display: grid; gap: 12px; }
+.metric { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 6px 18px; align-items: center; }
+.metric > span { font-size: 14px; }
+.metric small { color: var(--muted); display: block; font-size: 12px; }
+.pair { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: 1fr 64px; align-items: center; gap: 8px; }
+.bar i { display: block; height: 12px; border-radius: 0 4px 4px 0; width: calc(var(--w) * 100%); background: var(--c); min-width: 2px; }
+.bar output { font: 500 13px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.graphs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.gbox { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; display: grid; gap: 8px; }
+.gbox svg { width: 100%; height: auto; }
+.gbox .cap { font-size: 13px; color: var(--muted); }
+.gbox .cap b { color: var(--ink); font-family: var(--mono); }
+details { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; }
+summary { cursor: pointer; font-weight: 500; }
+.lists { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
+.lists ol { margin: 0; padding-left: 22px; display: grid; gap: 3px; font-size: 13px; }
+.lists .rec { color: var(--seed); font-weight: 500; }
+.lists .miss { color: var(--bad); }
+
+footer { padding-block: 56px 72px; display: grid; gap: 14px; }
+pre { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font: 13px/1.55 var(--mono); }
+
+@media (max-width: 860px) {
+  .panels, .graphs, .lists { grid-template-columns: 1fr; }
+  .metric { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .call, .final { animation: none; } .running::after { animation: none; content: "..."; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="brand">
+    <svg viewBox="0 0 128 128" role="img" aria-label="Citation Lens logo">
+      <defs><marker id="arr" markerUnits="userSpaceOnUse" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0.5 10 5 0 9.5z" fill="var(--lens)"/></marker></defs>
+      <g stroke="var(--lens)" stroke-width="1.7" stroke-linecap="round">
+        <line x1="49.4" y1="51.3" x2="35.3" y2="40.7" marker-end="url(#arr)"/>
+        <line x1="49.4" y1="56.7" x2="35.3" y2="67.3" marker-end="url(#arr)"/>
+        <line x1="73.6" y1="40.7" x2="59.5" y2="51.3" marker-end="url(#arr)"/>
+        <line x1="73.6" y1="67.3" x2="59.5" y2="56.7" marker-end="url(#arr)"/>
+        <line x1="54" y1="25.6" x2="54" y2="46.1" marker-end="url(#arr)"/>
+      </g>
+      <g fill="var(--lens)"><circle cx="30" cy="38" r="4.6"/><circle cx="30" cy="70" r="4.6"/><circle cx="78" cy="38" r="4.6"/><circle cx="78" cy="70" r="4.6"/></g>
+      <circle cx="54" cy="22" r="3.6" fill="none" stroke="var(--lens)" stroke-width="1.8"/>
+      <circle cx="54" cy="54" r="6.5" fill="var(--seed)"/>
+      <circle cx="54" cy="54" r="40" fill="none" stroke="var(--lens)" stroke-width="7"/>
+      <line x1="83" y1="83" x2="112" y2="112" stroke="var(--lens)" stroke-width="11" stroke-linecap="round"/>
+    </svg>
+    <h1>Citation Lens</h1>
+  </div>
+  <p class="tag">Literature research for Codex and Claude Code. Find the defining papers, walk their citation graph in both directions, surface the newest work, and cite only links you can check.</p>
+  <div class="pills"><span class="pill">5 MCP tools</span><span class="pill">Semantic Scholar + OpenAlex + arXiv</span><span class="pill">Cards, not documents</span><span class="pill">Agent stays in charge</span></div>
+</header>
+
+<section id="how">
+  <h2>Web search finds pages. Research needs a graph.</h2>
+  <p class="read">Ask an agent for the literature on a topic and it searches the web, opens a few pages and lists what it saw. Citation Lens gives it what a researcher uses instead: a citation graph. Start from a few papers you trust, and see what they build on, what builds on them, and what appeared last month.</p>
+  <div class="steps">
+    <div class="step"><span class="k">1 · SEARCH</span><h3>Search wide, once</h3><p>2–4 query variants on three scholarly indexes at the same time, merged and ranked together. Every third card is recent work.</p></div>
+    <div class="step"><span class="k">2 · CHOOSE</span><h3>Pick the seeds</h3><p>The agent chooses 3–6 papers that define the topic. That judgment stays with the agent; Lens only does the gathering.</p></div>
+    <div class="step"><span class="k">3 · WALK</span><h3>Walk the citation graph</h3><p>References, citing papers and similar papers of every seed, ranked by shared references and co-citation into three lanes.</p></div>
+    <div class="step"><span class="k">4 · READ</span><h3>Read only what matters</h3><p>Compact cards with a quotable abstract sentence first. Full abstracts, text and figures on demand, never all at once.</p></div>
+  </div>
+  <div class="lanes">
+    <svg viewBox="0 0 760 300" role="img" aria-label="A seed paper with prior work on the left, follow-up work on the right and recent work above">
+      <defs><marker id="arr2" markerUnits="userSpaceOnUse" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0.5 10 5 0 9.5z" fill="var(--lens)"/></marker></defs>
+      <g stroke="var(--lens)" stroke-width="2" stroke-linecap="round">
+        <line x1="330" y1="146" x2="196" y2="98" marker-end="url(#arr2)"/>
+        <line x1="330" y1="154" x2="196" y2="202" marker-end="url(#arr2)"/>
+        <line x1="560" y1="98" x2="432" y2="146" marker-end="url(#arr2)"/>
+        <line x1="560" y1="202" x2="432" y2="154" marker-end="url(#arr2)"/>
+        <line x1="380" y1="54" x2="380" y2="128" marker-end="url(#arr2)"/>
+      </g>
+      <g fill="var(--lens)"><circle cx="180" cy="92" r="12"/><circle cx="180" cy="208" r="12"/><circle cx="576" cy="92" r="12"/><circle cx="576" cy="208" r="12"/></g>
+      <circle cx="380" cy="42" r="10" fill="none" stroke="var(--lens)" stroke-width="2.5"/>
+      <circle cx="380" cy="150" r="20" fill="var(--seed)"/>
+      <text x="380" y="190" text-anchor="middle">Seed paper</text>
+      <text x="380" y="20" text-anchor="middle">Recent · last two years</text>
+      <text x="104" y="150" text-anchor="middle">Foundation</text><text class="sub" x="104" y="168" text-anchor="middle">what the seed builds on</text>
+      <text x="656" y="150" text-anchor="middle">Follow-up</text><text class="sub" x="656" y="168" text-anchor="middle">work that cites the seed</text>
+      <text class="sub" x="380" y="290" text-anchor="middle">Arrows point from the citing paper to the cited paper</text>
+    </svg>
+    <div class="legend3">
+      <p><b>Foundation.</b> Older papers the seeds cite, ranked by how many on-topic papers in the graph also cite them.</p>
+      <p><b>Follow-up.</b> Papers that cite or resemble the seeds, ranked by shared references (bibliographic coupling).</p>
+      <p><b>Recent.</b> Work from the last two years, including preprints too new to have citation counts.</p>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="stage-head">
+    <h2>Watch the two searches side by side</h2>
+    <p class="read">The same agent, the same question, the same budget. On the left it uses only its built-in web search. On the right it also has Citation Lens. This replays real recorded runs: every query, call and result below was captured from the run, not written for the demo.</p>
+    <div class="controls">
+      <label class="mono" for="scenario">Question</label>
+      <select id="scenario"></select>
+      <button class="primary" id="play" type="button">Play</button>
+      <button id="restart" type="button">Restart</button>
+      <span class="seg" role="group" aria-label="Replay speed">
+        <button type="button" data-speed="6" aria-pressed="true">1×</button>
+        <button type="button" data-speed="14" aria-pressed="false">2×</button>
+        <button type="button" data-speed="0" aria-pressed="false">Skip to end</button>
+      </span>
+    </div>
+    <div class="prompt" id="prompt"></div>
+  </div>
+
+  <div class="panels">
+    <div class="panel" data-side="web">
+      <div class="ph"><h3>Claude Code <small>· built-in web search and fetch</small></h3>
+        <div class="stats"><span>calls <b data-s="calls">0</b></span><span>results seen <b data-s="seen">0</b></span><span>time <b data-s="time">0</b> s</span></div></div>
+      <div class="log" id="log-web" role="log" aria-live="off"><p class="empty">Press Play.</p></div>
+    </div>
+    <div class="panel" data-side="lens">
+      <div class="ph"><h3>Claude Code <small>+ Citation Lens</small></h3>
+        <div class="stats"><span>calls <b data-s="calls">0</b></span><span>results seen <b data-s="seen">0</b></span><span>time <b data-s="time">0</b> s</span></div></div>
+      <div class="log" id="log-lens" role="log" aria-live="off"><p class="empty">Press Play.</p></div>
+    </div>
+  </div>
+  <p class="note" id="pacing"></p>
+
+  <div class="results" id="results" hidden>
+    <p class="verdict" id="verdict"></p>
+    <div class="bars" id="bars"></div>
+    <div class="graphs" id="graphs"></div>
+    <details><summary>Every paper each answer listed</summary><div class="lists" id="lists"></div></details>
+    <p class="note">A citation link counts as <b>verified</b> only when the cited paper appears in the citing paper's own reference list (arXiv bibliography or a scholarly index). Agents often <i>claim</i> far more links than they can support, so the graphs draw verified links only. Counts come from the independent grader in <code>evals/grade.py</code>.</p>
+  </div>
+</section>
+
+<footer>
+  <h2>Try it</h2>
+  <pre>claude plugin marketplace add beingamanforever/Citation-lens
+claude plugin install citation-lens@citation-lens</pre>
+  <pre>codex plugin marketplace add beingamanforever/Citation-lens
+codex plugin add citation-lens@citation-lens</pre>
+  <p class="note">Rebuild this page from any evaluation run with <code>python demo/build.py --run RUN_DIR --grades GRADES.json --scenario task:repetition</code>. To watch Lens on its own, run <code>python scripts/search.py "your topic" --expand 3</code>. Free <code>SEMANTIC_SCHOLAR_API_KEY</code> and <code>OPENALEX_API_KEY</code> keys make the providers far less likely to throttle.</p>
+</footer>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (n) => (n == null ? "–" : Number(n).toLocaleString("en-US"));
+
+const state = { scenario: null, rate: 6, clock: 0, playing: false, last: 0, events: [], next: 0, raf: 0 };
+const sides = ["web", "lens"];
+const logs = { web: $("#log-web"), lens: $("#log-lens") };
+const nodes = { web: {}, lens: {} };       // step index -> card element
+const counters = { web: { calls: 0, seen: 0 }, lens: { calls: 0, seen: 0 } };
+
+function seenOf(step) {
+  if (step.lens) return step.lens.documents ?? step.lens.shown ?? 0;
+  return step.n_links ?? (step.links ? step.links.length : 0);
+}
+
+function buildEvents(scn) {
+  const events = [];
+  for (const side of sides) {
+    const run = scn[side], n = run.steps.length, T = run.seconds, span = 0.66 * T;
+    run.steps.forEach((step, i) => {
+      events.push({ t: (span * i) / n, side, kind: "start", i });
+      events.push({ t: (span * (i + 1)) / n, side, kind: "end", i });
+    });
+    events.push({ t: T, side, kind: "final" });
+  }
+  return events.sort((a, b) => a.t - b.t);
+}
+
+function resultHtml(side, step) {
+  if (step.failed) return `<p class="warn">Failed: ${esc(step.failed)}</p>`;
+  if (side === "web") {
+    if (step.links) return `<ul class="links">${step.links.map((l) => `<li>${esc(l.title)}</li>`).join("")}</ul>` + (step.n_links > step.links.length ? `<p class="sum">+ ${step.n_links - step.links.length} more links returned</p>` : "");
+    return `<p class="sum">${esc(step.note || "Page fetched.")}</p>`;
+  }
+  const r = step.lens || {};
+  if (r.error) return `<p class="warn">${esc(r.error)}</p>`;
+  let head = "";
+  if (step.tool === "research_search") head = `<p class="sum">Queried <b>${r.providers_total}</b> provider lookups in parallel${r.providers_failed ? `, <b>${r.providers_failed}</b> throttled` : ""}. Fused ranking, showing <b>${r.shown}</b> cards (<b>${fmt(r.bytes)}</b> bytes).</p>`;
+  else if (step.tool === "research_expand") head = `<p class="sum">Walked the graph: <b>${fmt(r.total)}</b> neighbors found, ranked into lanes. Showing <b>${r.shown}</b> cards and <b>${r.edges}</b> citing→cited edges (<b>${fmt(r.bytes)}</b> bytes).${r.errors?.length ? ` <span class="warn">Partial: ${esc(r.errors[0])}</span>` : ""}</p>`;
+  else if (step.tool === "research_graph") head = `<p class="sum">Next page from the saved snapshot, no new requests: <b>${r.shown}</b> more cards.</p>`;
+  else head = `<p class="sum">Read <b>${r.documents}</b> abstracts in one call (<b>${fmt(r.bytes)}</b> bytes).</p>`;
+  const cards = (r.cards || []).slice(0, step.tool === "research_read" ? 0 : 5).map((c) => `<li class="${esc(c.lane || "")}"><span class="ctitle">${esc(c.title)}</span><span class="cmeta">${c.lane ? `<span class="lane ${esc(c.lane)}">${esc(c.lane)}</span>` : ""}<span>${esc(c.year ?? "")}</span><span>${fmt(c.cites)} citations</span></span>${c.why ? `<span class="cmeta why">${esc(c.why)}</span>` : ""}</li>`).join("");
+  return head + (cards ? `<ul class="cards">${cards}</ul>` : "");
+}
+
+function applyEvent(ev) {
+  const run = state.scenario[ev.side], log = logs[ev.side];
+  if (ev.kind === "final") {
+    const f = el("div", "final", `<b>Final answer written</b><span>${run.papers.length} papers listed, ${run.links_claimed} citation links claimed.</span>`);
+    log.append(f); log.scrollTop = log.scrollHeight; return;
+  }
+  const step = run.steps[ev.i];
+  if (ev.kind === "start") {
+    counters[ev.side].calls += 1;
+    const card = el("div", "call", `<div class="call-top"><span class="badge ${ev.side}">${esc(step.tool)}</span><span class="qtext">${esc(step.text)}</span></div><p class="running">running</p>`);
+    nodes[ev.side][ev.i] = card; log.append(card);
+  } else {
+    counters[ev.side].seen += seenOf(step);
+    const card = nodes[ev.side][ev.i];
+    if (step.failed) card.classList.add("failed");
+    card.querySelector(".running")?.remove();
+    card.append(el("div", "res", resultHtml(ev.side, step)));
+  }
+  log.scrollTop = log.scrollHeight;
+}
+
+function paintStats() {
+  const clock = state.clock;
+  for (const side of sides) {
+    const panel = $(`.panel[data-side="${side}"]`), run = state.scenario[side];
+    panel.querySelector('[data-s="calls"]').textContent = counters[side].calls;
+    panel.querySelector('[data-s="seen"]').textContent = counters[side].seen;
+    panel.querySelector('[data-s="time"]').textContent = Math.min(clock, run.seconds).toFixed(0);
+  }
+}
+
+function reset() {
+  cancelAnimationFrame(state.raf);
+  state.playing = false; state.clock = 0; state.next = 0;
+  $("#play").textContent = "Play";
+  for (const side of sides) { logs[side].innerHTML = '<p class="empty">Press Play.</p>'; nodes[side] = {}; counters[side] = { calls: 0, seen: 0 }; }
+  $("#results").hidden = true;
+  state.events = buildEvents(state.scenario);
+  paintStats();
+}
+
+function clearPlaceholders() {
+  for (const side of sides) if (logs[side].querySelector(".empty")) logs[side].innerHTML = "";
+}
+
+function finish() {
+  cancelAnimationFrame(state.raf);
+  clearPlaceholders();
+  while (state.next < state.events.length) applyEvent(state.events[state.next++]);
+  state.clock = Math.max(state.scenario.web.seconds, state.scenario.lens.seconds);
+  state.playing = false;
+  $("#play").textContent = "Replay";
+  paintStats();
+  showResults();
+}
+
+function tick(now) {
+  if (!state.playing) return;
+  const dt = (now - state.last) / 1000; state.last = now;
+  state.clock += dt * state.rate;
+  if (state.next === 0) clearPlaceholders();
+  while (state.next < state.events.length && state.events[state.next].t <= state.clock) applyEvent(state.events[state.next++]);
+  paintStats();
+  if (state.next >= state.events.length) return finish();
+  state.raf = requestAnimationFrame(tick);
+}
+
+function play() {
+  if (state.next >= state.events.length) reset();
+  if (state.rate === 0) return finish();
+  state.playing = !state.playing;
+  $("#play").textContent = state.playing ? "Pause" : "Play";
+  if (state.playing) { state.last = performance.now(); state.raf = requestAnimationFrame(tick); }
+}
+
+/* results: bars, graphs, lists */
+function metricRows(scn) {
+  const w = scn.web, l = scn.lens;
+  return [
+    ["Papers listed", "in the final answer", w.papers.length, l.papers.length],
+    ["Judged relevant", "by the grader's blinded labels", w.useful, l.useful],
+    ["Recent and relevant", "published in the last two years", w.recent_useful, l.recent_useful],
+    ["Citation links verified", "found in the citing paper's reference list", w.links_verified, l.links_verified],
+    ["Citation links claimed", "most are not provable", w.links_claimed, l.links_claimed],
+    ["Seconds", "lower is faster", Math.round(w.seconds), Math.round(l.seconds)],
+    ["Tool calls", "", w.steps.length, l.steps.length],
+  ];
+}
+
+function verdictText(scn) {
+  const w = scn.web, l = scn.lens, wins = [], losses = [];
+  for (const [label, a, b] of [["verified citation links", l.links_verified, w.links_verified], ["recent relevant papers", l.recent_useful, w.recent_useful], ["relevant papers", l.useful, w.useful]]) {
+    if (a > b) wins.push(`${a} ${label} against ${b}`);
+    else if (a < b) losses.push(`${a} ${label} against ${b}`);
+  }
+  const slower = l.seconds > w.seconds ? ` It took ${Math.round(l.seconds - w.seconds)} seconds longer.` : "";
+  const lost = losses.length ? ` It did worse on ${losses.join(" and ")}.` : "";
+  if (!wins.length) return `On this question Citation Lens did not beat the agent's own search: ${losses.join(", ")}.${slower}`;
+  return `With Citation Lens: ${wins.join(", ")}.${lost}${slower}`;
+}
+
+function graphSvg(run, color) {
+  const ps = run.papers.filter((p) => p.found).sort((a, b) => (a.year || 0) - (b.year || 0));
+  const n = ps.length, cx = 190, cy = 150, R = 118, pos = {};
+  ps.forEach((p, i) => { const a = (i / Math.max(n, 1)) * 2 * Math.PI - Math.PI / 2; pos[p.key] = [cx + R * Math.cos(a), cy + R * Math.sin(a)]; });
+  const edges = run.verified_edges.filter(([a, b]) => pos[a] && pos[b]);
+  const lines = edges.map(([a, b]) => `<line x1="${pos[a][0].toFixed(1)}" y1="${pos[a][1].toFixed(1)}" x2="${pos[b][0].toFixed(1)}" y2="${pos[b][1].toFixed(1)}"/>`).join("");
+  const dots = ps.map((p) => `<circle cx="${pos[p.key][0].toFixed(1)}" cy="${pos[p.key][1].toFixed(1)}" r="${p.recent ? 6 : 4.5}" ${p.recent ? `fill="var(--surface)" stroke="${color}" stroke-width="2.5"` : `fill="${color}"`}><title>${esc(p.title)} (${p.year ?? "?"})</title></circle>`).join("");
+  return `<svg viewBox="0 0 380 300" role="img" aria-label="${edges.length} verified citation links among ${n} papers"><g stroke="${color}" stroke-width="1.4" opacity=".55">${lines}</g>${dots}<text x="190" y="146" text-anchor="middle" font-family="var(--mono)" font-size="26" font-weight="500" fill="var(--ink)">${edges.length}</text><text x="190" y="166" text-anchor="middle" font-family="var(--body)" font-size="12" fill="var(--muted)">verified links</text></svg>`;
+}
+
+function showResults() {
+  const scn = state.scenario, box = $("#results");
+  $("#verdict").textContent = verdictText(scn);
+  $("#bars").innerHTML = metricRows(scn).map(([name, sub, a, b]) => {
+    const max = Math.max(a, b, 1);
+    return `<div class="metric"><span>${esc(name)}<small>${esc(sub)}</small></span><div class="pair"><div class="bar"><i style="--w:${a / max};--c:var(--native)"></i><output>${a}</output></div><div class="bar"><i style="--w:${b / max};--c:var(--lens)"></i><output>${b}</output></div></div></div>`;
+  }).join("") + `<p class="note"><span style="color:var(--native)">■</span> Claude Code alone &nbsp; <span style="color:var(--lens)">■</span> Claude Code + Citation Lens</p>`;
+  $("#graphs").innerHTML = ["web", "lens"].map((s) => `<div class="gbox"><h3>${s === "web" ? "Claude Code alone" : "With Citation Lens"}</h3>${graphSvg(scn[s], s === "web" ? "var(--native)" : "var(--lens)")}<p class="cap"><b>${scn[s].verified_edges.length}</b> verified links drawn among <b>${scn[s].papers.filter((p) => p.found).length}</b> papers. Hollow circles are recent work.</p></div>`).join("");
+  $("#lists").innerHTML = ["web", "lens"].map((s) => `<div><h3>${s === "web" ? "Claude Code alone" : "With Citation Lens"}</h3><ol>${scn[s].papers.map((p) => `<li class="${p.found ? "" : "miss"}">${esc(p.title)} <span class="${p.recent ? "rec" : ""}">(${p.year ?? "?"}${p.found ? "" : ", not found in an index"})</span></li>`).join("")}</ol></div>`).join("");
+  box.hidden = false;
+}
+
+function load(id) {
+  state.scenario = DATA.scenarios.find((s) => s.id === id) || DATA.scenarios[0];
+  $("#prompt").innerHTML = `<b>Question.</b> ${esc(state.scenario.prompt)}`;
+  const w = state.scenario.web.seconds, l = state.scenario.lens.seconds;
+  $("#pacing").textContent = `Recorded run times: ${Math.round(w)} s without Lens, ${Math.round(l)} s with it, replayed faster. The order of calls and every result shown are real; the pause between calls is estimated, because the log does not time each call.`;
+  reset();
+}
+
+const select = $("#scenario");
+DATA.scenarios.forEach((s) => select.append(new Option(s.label, s.id)));
+select.addEventListener("change", () => load(select.value));
+$("#play").addEventListener("click", play);
+$("#restart").addEventListener("click", () => { reset(); if (state.rate === 0) finish(); else play(); });
+document.querySelectorAll("[data-speed]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-speed]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  state.rate = Number(b.dataset.speed);
+  if (state.rate === 0) finish();
+}));
+load(DATA.scenarios[0].id);
+</script>
+</body>
+</html>
