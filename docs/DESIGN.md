@@ -19,6 +19,8 @@ This is the objective, not a guarantee: the historical Codex comparison passed, 
 
 ## The paradigm: discover, connect, verify
 
+Full diagrams of the system, a session, expansion and failure handling are in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ```mermaid
 flowchart LR
     Q[Question] --> S[research_search<br/>short query variants]

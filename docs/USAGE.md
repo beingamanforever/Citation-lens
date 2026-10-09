@@ -50,3 +50,15 @@ With code execution, run discovery outside the model context and print only what
 ```bash
 python scripts/search.py "FlashAttention" "ring attention" --expand 3 --show 15
 ```
+
+## Demo
+
+`demo/index.html` explains Citation Lens and replays recorded runs side by side: the agent's own web search against the same agent with Citation Lens.
+Open it in a browser; it is one self-contained file.
+Every query, call and returned card is read from the recorded run, and the citation counts come from the grader, which counts a link only if the cited paper is in the citing paper's reference list.
+
+Rebuild it from any evaluation run:
+
+```bash
+python demo/build.py --run ../output/evals-v3/heldout-claude --grades ../output/evals-v3/heldout-claude-audit/grades.json --scenario state_space_frontier:2 --scenario dpo_lineage:2
+```
