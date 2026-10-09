@@ -1,34 +1,67 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo-light.svg" alt="Citation Lens" width="440">
-  </picture>
+  <img src="assets/logo-banner.svg" alt="Citation Lens: follow the papers that matter" width="520">
 </p>
 
 <h3 align="center">Web search finds pages. Research needs a graph.</h3>
 
 <p align="center">
-  Literature research for your coding agent: a citation graph with verified links, for Codex and Claude Code.
+  A literature-research plugin for <b>Codex</b> and <b>Claude Code</b>:<br>
+  find the defining papers, follow their citations both ways, and keep only the links you can verify.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a78d6"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-2a78d6">
+  <img alt="Works with Codex and Claude Code" src="https://img.shields.io/badge/works%20with-Codex%20%C2%B7%20Claude%20Code-e8622c">
+  <img alt="MCP server" src="https://img.shields.io/badge/MCP-stdio-444">
 </p>
 
 <p align="center">
   <a href="#install">Install</a> ·
-  <a href="#see-it-work">Watch</a> ·
+  <a href="#see-it-work">See it work</a> ·
   <a href="demo/index.html">Side-by-side demo</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
-  <a href="#results">Results</a>
+  <a href="docs/RESULTS.md">Results</a>
 </p>
 
 <p align="center">
-  <video src="https://github.com/beingamanforever/Citation-lens/raw/main/video/citation-lens.mp4" poster="video/poster.png" controls muted width="860">
-    <a href="video/citation-lens.mp4"><img src="video/poster.png" alt="Citation Lens in 47 seconds" width="860"></a>
-  </video>
+  <a href="https://github.com/beingamanforever/Citation-lens/blob/main/video/citation-lens.mp4"><img src="video/poster.png" alt="Play the 47-second Citation Lens explainer" width="860"></a>
 </p>
 
-<p align="center"><sub>47 seconds, with voice-over. <a href="video/citation-lens.mp4">Open the video file</a> if it does not play here.</sub></p>
+## Why Citation Lens
 
-A literature-research plugin for Codex and Claude Code.
-Give it a research question; it finds the defining papers, walks their citation graph forward and backward like [Connected Papers](https://www.connectedpapers.com/about), surfaces the newest preprints, and hands the agent compact previews it can verify and cite.
+- **A graph, not a list.** From a few seed papers it walks references and citing papers like [Connected Papers](https://www.connectedpapers.com/about), and returns three lanes: foundations, follow-ups and what is new.
+- **Links you can trust.** A citation counts only when the citing paper's own reference list says so; similarity is never reported as a citation.
+- **Small, fast, parallel.** Every query runs on Semantic Scholar, OpenAlex and arXiv at once, and the agent gets compact cards, not whole papers.
+- **The agent stays in charge.** Lens gathers, ranks and previews; the agent screens, verifies and writes.
+
+
+## See it work
+
+One recorded Claude Code run on "What's new in linear-time sequence modeling?", frame by frame from the video.
+
+**1. Search wide.** One call fans every query variant out to Semantic Scholar, OpenAlex and arXiv.
+
+![Query variants fan out to three scholarly indexes](assets/screens/search.png)
+
+**2. Pick seeds.** The agent chooses the papers that define the topic; Lens only gathers.
+
+![The agent picks six seed papers](assets/screens/seeds.png)
+
+**3. Walk the graph.** Foundations on the left, follow-ups on the right, recent work on top: 998 neighbors ranked into 60 cards.
+
+![Seeds in the middle with foundation, follow-up and recent lanes](assets/screens/graph.png)
+
+**4. Verify links.** A link is kept only if the paper's own reference list contains it.
+
+![A claimed citation is found in the paper's reference list](assets/screens/verify.png)
+
+**5. Compare.** The same agent with and without Citation Lens: verified links went from 7 to 23 and tool calls from 8 to 5, at the cost of 30 more seconds.
+Across all 18 paired runs Lens verified more links in 13 and fewer in 4; the overall judge still preferred Claude alone, see [Results](#results).
+
+![Claude Code alone against Claude Code with Citation Lens](assets/screens/compare.png)
+
+Open [`demo/index.html`](demo/index.html) for a side-by-side replay of recorded runs, or read the [architecture diagrams](docs/ARCHITECTURE.md).
 
 ## How it works
 
@@ -47,25 +80,6 @@ Give it a research question; it finds the defining papers, walks their citation 
    Shared references and similarity never become citation links.
 
 The agent stays in charge of judgment: Lens gathers, ranks and previews; the agent screens, verifies and writes.
-
-## See it work
-
-Frames from the video, from one recorded Claude Code run on "What's new in linear-time sequence modeling?"
-
-| 1. Search wide | 2. Pick seeds |
-| :---: | :---: |
-| ![One call fans every query variant out to Semantic Scholar, OpenAlex and arXiv](assets/screens/search.png) | ![The agent picks the seed papers; Lens only gathers](assets/screens/seeds.png) |
-| **3. Walk the graph** | **4. Verify links** |
-| ![Seeds in the middle, foundations on the left, follow-ups on the right, recent work on top](assets/screens/graph.png) | ![A claimed link is confirmed in the paper's own reference list](assets/screens/verify.png) |
-
-**5. Compare.** The same agent with and without Citation Lens.
-In this run verified links went from 7 to 23 and tool calls from 8 to 5, at the cost of 30 more seconds.
-Across all 18 paired runs Lens verified more links in 13 and fewer in 4; the overall judge still preferred Claude alone, see [Results](#results).
-
-![Claude Code alone against Claude Code with Citation Lens](assets/screens/compare.png)
-
-Open [`demo/index.html`](demo/index.html) for a side-by-side replay of recorded runs, or read the [architecture diagrams](docs/ARCHITECTURE.md) for the whole system, a typical session and what `research_expand` does.
-Verified DOI or arXiv IDs found through native search can go straight to reading, without another title search.
 
 ## Install
 
@@ -95,34 +109,10 @@ In Claude Code you can also run `/citation-lens:research <topic>`.
 
 ## Results
 
-The goal is more relevant papers and trustworthy citations than the host's default web research, under a matched budget.
-Quality, completion rate, time and tokens are measured separately.
+- **Codex:** on 10 held-out tasks, twice each, the order-swapped judge favored Lens in 17 of 20 pairs (one loss, two ties).
+- **Claude Code:** Lens finds more verified citation links but does not yet beat Claude's own search overall (7 wins, 10 losses, 3 ties).
 
-Each host was tested on 10 held-out tasks, twice each, under matched conditions.
-After verification repairs and masking explicit tool names, the order-swapped judge favored Lens in **17 Codex pairs**, with one loss and two ties.
-For **Claude Code, Lens won seven, lost ten and tied three**.
-It does not meet our Claude quality goal yet: higher paper counts came with lower must-find recall and more input tokens.
-
-| Mean per attempt | Codex | Codex + Lens | Claude | Claude + Lens |
-| --- | ---: | ---: | ---: | ---: |
-| Directly relevant papers | 13.1 | 19.2 | 17.7 | 20.4 |
-| Recent useful papers | 5.6 | 9.1 | 7.7 | 8.1 |
-| Verified links between useful papers | 2.7 | 8.5 | 4.2 | 4.6 |
-| Must-find recall | 0.707 | 0.732 | 0.848 | 0.778 |
-| Completed attempts | 19 / 20 | 18 / 20 | 19 / 20 | 20 / 20 |
-| Seconds | 258 | 335 | 131 | 126 |
-| Reported input tokens, including cached | 275k | 386k | 47k | 109k |
-
-Failed attempts receive zero quality credit.
-Three Codex timeouts lack token usage; token means exclude them.
-These are historical keyless measurements with model-based judges, from the packages recorded in each export.
-Inspected tasks become regression cases for future changes; new behavior needs fresh held-out evidence.
-Three later development candidates failed the saved quality and efficiency requirements.
-Version 0.2.2 ships separately verified correctness repairs, including exact DOI recovery; it has no demonstrated end-to-end performance gain.
-
-[Protocol, failures and reproduction](docs/EVALUATION.md) · [Codex evidence](docs/results/codex-heldout.json) · [Claude evidence](docs/results/claude-heldout.json)
-[Development comparisons](docs/DEVELOPMENT.md)
-[DOI recovery checks](docs/DOI_RECOVERY.md)
+[Full tables, protocol, failures and reproduction](docs/RESULTS.md) · [Evaluation protocol](docs/EVALUATION.md)
 
 [Design and research basis](docs/DESIGN.md) · [Privacy](docs/PRIVACY.md) ·
 [Development](docs/PUBLISHING.md) · [MIT license](LICENSE)
