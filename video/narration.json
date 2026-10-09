@@ -1,0 +1,153 @@
+{
+ "voice": "af_heart",
+ "lead": 0.35,
+ "tail": 0.45,
+ "min_stretch": 1.15,
+ "end_hold": 1.1,
+ "design": [
+  3.6,
+  4.5,
+  2.6,
+  8.6,
+  4.4,
+  4.0,
+  2.3
+ ],
+ "scenes": [
+  {
+   "id": "hook",
+   "phrases": [
+    {
+     "text": "Web search finds pages.",
+     "speed": 1.0,
+     "pause": 0.35
+    },
+    {
+     "text": "Research needs a graph.",
+     "speed": 0.88,
+     "pause": 0.4
+    },
+    {
+     "text": "Citation Lens gives your coding agent one.",
+     "speed": 1.06,
+     "pause": 0.0
+    }
+   ]
+  },
+  {
+   "id": "search",
+   "phrases": [
+    {
+     "text": "One call searches three scholarly indexes at once,",
+     "speed": 1.1,
+     "pause": 0.1
+    },
+    {
+     "text": "and ranks everything that comes back.",
+     "speed": 0.98,
+     "pause": 0.0
+    }
+   ]
+  },
+  {
+   "id": "seeds",
+   "phrases": [
+    {
+     "text": "Your agent stays in charge.",
+     "speed": 0.94,
+     "pause": 0.25
+    },
+    {
+     "text": "It picks the papers that define the topic.",
+     "speed": 1.04,
+     "pause": 0.0
+    }
+   ]
+  },
+  {
+   "id": "walk",
+   "phrases": [
+    {
+     "text": "Then Lens follows citations both ways,",
+     "speed": 1.0,
+     "pause": 0.15
+    },
+    {
+     "text": "ranking nearly a thousand neighbors into three lanes:",
+     "speed": 1.1,
+     "pause": 0.15
+    },
+    {
+     "text": "foundations, follow-ups, and what's new.",
+     "speed": 0.9,
+     "pause": 0.0
+    }
+   ]
+  },
+  {
+   "id": "verify",
+   "phrases": [
+    {
+     "text": "But a link only counts",
+     "speed": 0.98,
+     "pause": 0.0
+    },
+    {
+     "text": "if the paper's own reference list says so.",
+     "speed": 0.88,
+     "pause": 0.5
+    },
+    {
+     "text": "Forty-five claimed.",
+     "speed": 0.96,
+     "pause": 0.3
+    },
+    {
+     "text": "Twenty-three proven.",
+     "speed": 0.86,
+     "pause": 0.0
+    }
+   ]
+  },
+  {
+   "id": "compare",
+   "phrases": [
+    {
+     "text": "Same agent, same question.",
+     "speed": 1.02,
+     "pause": 0.3
+    },
+    {
+     "text": "Seven verified links became twenty-three,",
+     "speed": 0.9,
+     "pause": 0.12
+    },
+    {
+     "text": "in five calls instead of eight.",
+     "speed": 1.02,
+     "pause": 0.3
+    },
+    {
+     "text": "A little slower.",
+     "speed": 0.96,
+     "pause": 0.0
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "phrases": [
+    {
+     "text": "Citation Lens,",
+     "speed": 0.9,
+     "pause": 0.2
+    },
+    {
+     "text": "for Codex and Claude Code.",
+     "speed": 1.0,
+     "pause": 0.0
+    }
+   ]
+  }
+ ]
+}

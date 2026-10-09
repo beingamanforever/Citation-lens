@@ -1,0 +1,17 @@
+{
+  "name": "citation-lens-video",
+  "private": true,
+  "type": "module",
+  "description": "Renders the 30-second Citation Lens explainer from video/index.html",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@fontsource/inter": "5.2.5",
+    "@fontsource/inter-tight": "5.2.5",
+    "@lobehub/icons-static-svg": "^1.95.1",
+    "ffmpeg-static": "5.2.0",
+    "lucide-static": "^1.54.0",
+    "puppeteer-core": "24.10.0"
+  }
+}

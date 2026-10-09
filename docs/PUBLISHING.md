@@ -17,8 +17,8 @@ or publishing secret is required.
 uv venv
 uv pip install -r requirements-test.txt
 uv pip install --no-deps -e .
-uv run --no-project ruff check src tests scripts evals
-uv run --no-project ruff format --check src tests scripts evals
+uv run --no-project ruff check src tests scripts evals demo video
+uv run --no-project ruff format --check src tests scripts evals demo video
 uv run --no-project pytest -q
 uv run --no-project python scripts/package.py
 claude plugin validate .

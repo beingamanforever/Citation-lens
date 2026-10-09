@@ -21,8 +21,8 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r requirements-test.txt
       - run: python -m pip install --no-deps -e .
-      - run: ruff check src tests scripts evals
-      - run: ruff format --check src tests scripts evals
+      - run: ruff check src tests scripts evals demo video
+      - run: ruff format --check src tests scripts evals demo video
       - run: pytest -q
       - run: python scripts/package.py
       - run: git diff --exit-code
